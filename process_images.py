@@ -23,14 +23,17 @@ import matplotlib.pyplot as plt
 import imageio
 import numpy as np
 from copy import copy, deepcopy
-from skimage import  color, data, restoration, exposure, img_as_float, img_as_uint, img_as_ubyte, util
-from skimage.filters import threshold_otsu
+from skimage import  feature, color, data, restoration, exposure, img_as_float, img_as_uint, img_as_ubyte, util
+from skimage.filters import threshold_otsu, threshold_sauvola, threshold_niblack, difference_of_gaussians, window, scharr, sobel, roberts
+
+from scipy.fftpack import fftn, fftshift, fft2, ifft2
 
 from functools import partial
 
 from scipy.optimize import curve_fit, minimize
 from scipy import ndimage
 from scipy.signal import convolve2d as conv2
+
 
 from datetime import datetime
 
@@ -92,6 +95,40 @@ class OtsuThreshold(ProcessImage):
         ax[2].axis('off')
 
         plt.show()
+
+
+class SauvolaThreshold(ProcessImage):
+    def __init__(self):
+        self.name = "SauvolaThreshold"
+
+    def process(self, image):
+        window = 25
+        #        self.thresh = threshold_niblack(image, window_size=window, k=0.8)
+        # self.thresh = threshold_sauvola(image, window_size=window)
+        self.output = img_as_ubyte(image > self.thresh)
+
+
+    def plot(self, original_image):
+        fig, axes = plt.subplots(ncols=3, figsize=(8, 2.5))
+        ax = axes.ravel()
+        ax[0] = plt.subplot(1, 3, 1)
+        ax[1] = plt.subplot(1, 3, 2)
+        ax[2] = plt.subplot(1, 3, 3, sharex=ax[0], sharey=ax[0])
+
+        ax[0].imshow(original_image, cmap=plt.cm.gray)
+        ax[0].set_title('Original')
+        ax[0].axis('off')
+
+        ax[1].hist(original_image.ravel(), bins=256)
+        ax[1].set_title('Histogram')
+        ax[1].axvline(self.thresh.mean(), color='r')
+
+        ax[2].imshow(self.output, cmap=plt.cm.gray)
+        ax[2].set_title('Thresholded')
+        ax[2].axis('off')
+
+        plt.show()
+
 
 class Threshold(ProcessImage):
     def __init__(self):
@@ -327,7 +364,7 @@ class DeconvoluteNoise(ProcessImage):
         # Define a point spread function, this one is arbitrary
         psf = np.ones((5, 5)) / 25
         #        self.output = conv2(image, psf, 'same')
-        self.output = restoration.richardson_lucy(image, psf, 30)
+        self.output = restoration.richardson_lucy(image, psf, 10)
 
         
     def plot(self, original_image):
@@ -454,6 +491,80 @@ class FFTGaussianFilter(ProcessImage):
         plt.title('Blurred image with Gaussian filter')
         plt.show()
 
+#####################################
+###---   FFT Bandpass filter   ---###
+#####################################
+
+
+class FFTBandpassFilter(ProcessImage):
+    def __init__(self):
+        self.name = "FFTBandpassFilter"
+
+    def process(self, image):
+        self.output = difference_of_gaussians(image, 1, 12)
+        return
+
+    def plot(self, original_image):
+        fig, axes = plt.subplots(ncols=2, figsize=(6, 2.5))
+        ax = axes.ravel()
+        ax[0] = plt.subplot(1, 2, 1)
+        ax[1] = plt.subplot(1, 2, 2, sharex=ax[0], sharey=ax[0])
+
+        ax[0].imshow(original_image, cmap='gray')
+        ax[0].set_title('Original Image')
+        ax[1].imshow(self.output, cmap='gray')
+        ax[1].set_title('Filtered Image')
+        plt.show()
+
+
+###########################
+###---   FFTFilter   ---###
+###########################
+
+class FFTFilter(ProcessImage):
+    def __init__(self):
+        self.name = "FFTFilter"
+
+    def process(self, image):
+        im_fft = fft2(image)
+
+        # Define the fraction of coefficients (in each direction) we keep
+        keep_fraction = 0.1
+
+        # Call ff a copy of the original transform. Numpy arrays have a copy
+        # method for this purpose.
+        im_fft2 = im_fft.copy()
+
+        # Set r and c to be the number of rows and columns of the array.
+        r, c = im_fft2.shape
+
+        # Set to zero all rows with indices between r*keep_fraction and
+        # r*(1-keep_fraction):
+        im_fft2[int(r*keep_fraction):int(r*(1-keep_fraction))] = 0
+
+        # Similarly with the columns:
+        im_fft2[:, int(c*keep_fraction):int(c*(1-keep_fraction))] = 0
+
+        self.output = ifft2(im_fft2).real / 255.
+
+
+
+    def plot(self, original_image):
+        fig, axes = plt.subplots(ncols=2, figsize=(6, 2.5))
+        ax = axes.ravel()
+        ax[0] = plt.subplot(1, 2, 1)
+        ax[1] = plt.subplot(1, 2, 2, sharex=ax[0], sharey=ax[0])
+
+        ax[0].imshow(original_image, cmap='gray')
+        ax[0].set_title('Original Image')
+        ax[1].imshow(self.output, cmap='gray')
+        ax[1].set_title('Filtered Image')
+        plt.show()
+
+
+
+
+
 
 ##########################################
 ###---   White Background Removal   ---###
@@ -465,10 +576,14 @@ class WhiteBackgroundRemoval(ProcessImage):
 
     def process(self, image):
         image_inverted = util.invert(image)
-        background_inverted = restoration.rolling_ball(image_inverted, radius=90)
+        background_inverted = restoration.rolling_ball(image_inverted, radius=70)
 
         self.output = util.invert(image_inverted - background_inverted)
+        self.output = img_as_float(self.output)
+
         self.background = util.invert(background_inverted)
+
+        # Getting underflow errort for some reason
 
     def plot(self, original_image):
         fig, ax = plt.subplots(nrows=1, ncols=3)
@@ -500,9 +615,9 @@ class BlackBackgroundRemoval(ProcessImage):
         self.name = "BlackBackgroundRemoval"
 
     def process(self, image):
-        self.background = restoration.rolling_ball(image, radius=45)
+        self.background = restoration.rolling_ball(image, radius=60)
         self.output = image - self.background
-        
+
 
     def plot(self, original_image):
         fig, ax = plt.subplots(nrows=1, ncols=3)
@@ -524,6 +639,134 @@ class BlackBackgroundRemoval(ProcessImage):
         plt.show()
 
  
+####################################
+###---   Gamma/log contrast   ---###
+####################################
+
+class GammaLogContrast(ProcessImage):
+    def __init__(self):
+        self.name = "GammaLogContrast"
+
+    def process(self, image):
+        # # Gamma
+        # gamma_corrected = exposure.adjust_gamma(img, 2)
+
+        # Logarithmic
+        self.output = exposure.adjust_log(img, 1)
+
+        return logarithmic_corrected
+
+    def plot(self, original_image):
+        fig, axes = plt.subplots(ncols=2, figsize=(6, 2.5))
+        ax = axes.ravel()
+        ax[0] = plt.subplot(1, 2, 1)
+        ax[1] = plt.subplot(1, 2, 2, sharex=ax[0], sharey=ax[0])
+
+        ax[0].imshow(original_image, cmap=plt.cm.gray)
+        ax[0].set_title('Original')
+        ax[0].axis('off')
+
+        ax[1].imshow(self.output, cmap=plt.cm.gray)
+        ax[1].set_title('Logarithmic contrast')
+
+        fig.tight_layout()
+        plt.show()
+
+        return
+
+
+#############################
+###---   Canny Edges   ---###
+#############################
+
+class CannyEdges(ProcessImage):
+    def __init__(self):
+        self.name = "CannyEdges"
+
+    def process(self, image):
+        self.output_sig1 = feature.canny(image)
+        self.output      = feature.canny(image, sigma=3)
+
+
+    def plot(self, original_image):
+        # display results
+        fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(8, 3))
+
+        ax[0].imshow(original_image, cmap='gray')
+        ax[0].set_title('noisy image', fontsize=20)
+
+        ax[1].imshow(self.output_sig1, cmap='gray')
+        ax[1].set_title(r'Canny filter, $\sigma=1$', fontsize=20)
+
+        ax[2].imshow(self.output, cmap='gray')
+        ax[2].set_title(r'Canny filter, $\sigma=3$', fontsize=20)
+
+        for a in ax:
+            a.axis('off')
+
+        fig.tight_layout()
+        plt.show()
+
+
+#############################
+###---   Sobel Edges   ---###
+#############################
+
+class SobelEdges(ProcessImage):
+    def __init__(self):
+        self.name = "SobelEdges"
+
+    def process(self, image):
+        self.output = sobel(image)
+
+
+    def plot(self, original_image):
+        # display results
+        fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 3))
+
+        ax[0].imshow(original_image, cmap='gray')
+        ax[0].set_title('Original image', fontsize=20)
+
+        ax[1].imshow(self.output, cmap='gray')
+        ax[1].set_title(r'Sobel filter', fontsize=20)
+
+        for a in ax:
+            a.axis('off')
+
+        fig.tight_layout()
+        plt.show()
+
+
+###############################
+###---   Scharr Filter   ---###
+###############################
+
+class ScharrEdges(ProcessImage):
+    def __init__(self):
+        self.name = "ScharrEdges"
+
+    def process(self, image):
+        self.output = scharr(image)
+
+
+    def plot(self, original_image):
+        # display results
+        fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 3))
+
+        ax[0].imshow(original_image, cmap='gray')
+        ax[0].set_title('Original image', fontsize=20)
+
+        ax[1].imshow(self.output, cmap='gray')
+        ax[1].set_title(r'Scharr filter', fontsize=20)
+
+        for a in ax:
+            a.axis('off')
+
+        fig.tight_layout()
+        plt.show()
+
+
+
 
 
 # Make a containing class which takes a process image instance and
@@ -540,7 +783,10 @@ class ProcessContainer:
 
     def process_images(self, plot=True):
         for image in self.images:
-            original_image =  color.rgb2gray(imageio.imread(f"{self.image_directory}/{image}"))
+            original_image =  imageio.imread(f"{self.image_directory}/{image}", as_gray=True)
+            if np.max(original_image) > 1.0:
+                # Scale to grayscale
+                original_image /= 255.
             self.method.process( original_image )
             if plot:
                 self.method.plot(original_image)
@@ -571,7 +817,7 @@ class ProcessContainer:
 if __name__ == '__main__':
     # Test out the functionality
 
-    image_directory = "images"
+    image_directory = "RemoveBakelite_images"
 
     processes = [OtsuThreshold,
                  Threshold,
@@ -582,6 +828,9 @@ if __name__ == '__main__':
                  WhiteBackgroundRemoval]
 
     processes = [RemoveBakelite, WhiteBackgroundRemoval,  OtsuThreshold]
+
+    processes = [ ScharrEdges ]
+
     for process in processes:
         pc = ProcessContainer(process, image_directory)
         pc.process_images(plot=True)
