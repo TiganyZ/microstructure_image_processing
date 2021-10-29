@@ -1,0 +1,32 @@
+#+TITLE: Microstructure Image Processing
+#+Author: Tigany Zarrouk 
+
+* Introduction
+
+This package was created for the purpose of analysing titanium
+microstructures from a variety of processing routes. Each of these
+routes provides microstructures which vary, from basketweave structure due to 
+processing in the beta phase field, to alpha + beta microstructures
+which are composed of primary alpha, which may be of varying sizes. 
+
+One of the goals in creating this package was finding a way to automatically find data pertaining to a given microstructure:
+- alpha/beta volume fraction
+- primary alpha size
+- secondary alpha lath size
+- prior beta grain size
+
+The package used for image processing was the scikit-image library
+provided by python. This must be greater than 0.18. Note that
+color.colortoRGB, which is used to process the colour images after
+imageio, may be depreciated and performance may vary.
+
+* Methods
+
+Primarily, the way to go about performing the analysis is as follows: 
+- Given image is converted to grayscale
+- Analysis is performed to remove unwanted regions (RemoveBakelite)
+- Background is removed using the rolling ball algorithm
+- A threshold is placed such that one can distinguish between the phases
+- This threshold is used itself as a way to analyse just the pixels coming beta/alpha
+
+  

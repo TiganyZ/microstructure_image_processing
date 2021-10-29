@@ -25,6 +25,8 @@ import numpy as np
 from copy import copy, deepcopy
 from skimage import  feature, color, data, restoration, exposure, img_as_float, img_as_uint, img_as_ubyte, util
 from skimage.filters import threshold_otsu, threshold_sauvola, threshold_niblack, difference_of_gaussians, window, scharr, sobel, roberts
+from skimage.segmentation import random_walker
+
 
 from scipy.fftpack import fftn, fftshift, fft2, ifft2
 
@@ -67,7 +69,8 @@ class ProcessImage(ABC):
 # > Works well for a bimodal distribution of pixel intensities.
     
 class OtsuThreshold(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "OtsuThreshold"
         
     def process(self, image):
@@ -98,13 +101,14 @@ class OtsuThreshold(ProcessImage):
 
 
 class SauvolaThreshold(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "SauvolaThreshold"
 
     def process(self, image):
         window = 25
         #        self.thresh = threshold_niblack(image, window_size=window, k=0.8)
-        # self.thresh = threshold_sauvola(image, window_size=window)
+        self.thresh = threshold_sauvola(image, window_size=window)
         self.output = img_as_ubyte(image > self.thresh)
 
 
@@ -131,7 +135,8 @@ class SauvolaThreshold(ProcessImage):
 
 
 class Threshold(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "Threshold"
 
     def gauss(self, x,mu,sigma,A):
@@ -235,7 +240,8 @@ class Threshold(ProcessImage):
         
         
 class RemoveBakelite(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "RemoveBakelite"
 
     def gauss(self, x,mu,sigma,A):
@@ -357,8 +363,10 @@ class RemoveBakelite(ProcessImage):
 #####################################
 
 class DeconvoluteNoise(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "DeconvoluteNoise"
+
         
     def process(self, image):
         # Define a point spread function, this one is arbitrary
@@ -377,7 +385,7 @@ class DeconvoluteNoise(ProcessImage):
         ax[0].imshow(original_image)
         ax[0].set_title('Original Data')
 
-        ax[1].imshow(self.output, vmin=original_image.min(), vmax=original_image.max())
+        ax[1].imshow(self.output, vmin=self.output.min(), vmax=self.output.max())
         ax[1].set_title('Restoration using\nRichardson-Lucy')
 
 
@@ -394,7 +402,8 @@ class DeconvoluteNoise(ProcessImage):
 # https://en.wikipedia.org/wiki/Histogram_equalization
 
 class HistogramEquilization(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "HistogramEquilization"
 
     def process(self, image):
@@ -478,7 +487,8 @@ class HistogramEquilization(ProcessImage):
 #######################################################################
 
 class FFTGaussianFilter(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "FFTGaussianFilter"
 
     def process(self, image):
@@ -497,7 +507,8 @@ class FFTGaussianFilter(ProcessImage):
 
 
 class FFTBandpassFilter(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "FFTBandpassFilter"
 
     def process(self, image):
@@ -522,7 +533,8 @@ class FFTBandpassFilter(ProcessImage):
 ###########################
 
 class FFTFilter(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "FFTFilter"
 
     def process(self, image):
@@ -571,12 +583,13 @@ class FFTFilter(ProcessImage):
 ##########################################
 
 class WhiteBackgroundRemoval(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "WhiteBackgroundRemoval"
 
     def process(self, image):
         image_inverted = util.invert(image)
-        background_inverted = restoration.rolling_ball(image_inverted, radius=70)
+        background_inverted = restoration.rolling_ball(image_inverted, radius=120)
 
         self.output = util.invert(image_inverted - background_inverted)
         self.output = img_as_float(self.output)
@@ -611,7 +624,8 @@ class WhiteBackgroundRemoval(ProcessImage):
 
 
 class BlackBackgroundRemoval(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "BlackBackgroundRemoval"
 
     def process(self, image):
@@ -644,7 +658,8 @@ class BlackBackgroundRemoval(ProcessImage):
 ####################################
 
 class GammaLogContrast(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "GammaLogContrast"
 
     def process(self, image):
@@ -652,9 +667,7 @@ class GammaLogContrast(ProcessImage):
         # gamma_corrected = exposure.adjust_gamma(img, 2)
 
         # Logarithmic
-        self.output = exposure.adjust_log(img, 1)
-
-        return logarithmic_corrected
+        self.output = exposure.adjust_log(image, 1)
 
     def plot(self, original_image):
         fig, axes = plt.subplots(ncols=2, figsize=(6, 2.5))
@@ -680,7 +693,8 @@ class GammaLogContrast(ProcessImage):
 #############################
 
 class CannyEdges(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "CannyEdges"
 
     def process(self, image):
@@ -713,7 +727,8 @@ class CannyEdges(ProcessImage):
 #############################
 
 class SobelEdges(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "SobelEdges"
 
     def process(self, image):
@@ -742,7 +757,8 @@ class SobelEdges(ProcessImage):
 ###############################
 
 class ScharrEdges(ProcessImage):
-    def __init__(self):
+    def __init__(self, args={}):
+        self.args = args
         self.name = "ScharrEdges"
 
     def process(self, image):
@@ -766,6 +782,47 @@ class ScharrEdges(ProcessImage):
         plt.show()
 
 
+####################################################
+###---  Segmentation of primary alpha and beta---###
+####################################################
+class RandomWalkerSegmentation(ProcessImage):
+    def __init__(self, args={}):
+        self.args = args
+        self.name = "RandomWalkerSegmentation"
+
+    def process(self, image):
+        import skimage
+
+        # Generate noisy synthetic data
+        sigma = 0.35
+
+        # The range of the binary image spans over (-1, 1).
+        # We choose the hottest and the coldest pixels as markers.
+        self.markers = np.zeros(image.shape, dtype=np.float)
+        self.markers[image < 0.05] = 1
+        self.markers[image > 0.95] = 2
+
+        # Run random walker algorithm
+        self.output = random_walker(image, self.markers, beta=10, mode='bf')
+
+    def plot(self, original_image):
+        # Plot results
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(8, 3.2),
+                                            sharex=True, sharey=True)
+        ax1.imshow(original_image, cmap='gray')
+        ax1.axis('off')
+        ax1.set_title('Noisy data')
+        ax2.imshow(self.markers, cmap='magma')
+        ax2.axis('off')
+        ax2.set_title('Markers')
+        ax3.imshow(self.output, cmap='gray')
+        ax3.axis('off')
+        ax3.set_title('Segmentation')
+
+        fig.tight_layout()
+        plt.show()
+
+
 
 
 
@@ -773,24 +830,31 @@ class ScharrEdges(ProcessImage):
 # then makes a corresponding directory for it
 
 class ProcessContainer:
-    def __init__(self, processing_method: Type[ProcessImage], image_directory: str):
+    def __init__(self, processing_method: Type[ProcessImage], method_args: dict, image_directory: str):
         self.image_directory = image_directory
         self.images = os.listdir(self.image_directory)
-
-        self.method = processing_method()
+        self.method_args = method_args
+        self.method = processing_method(self.method_args)
         self.method_name = self.method.name
 
 
     def process_images(self, plot=True):
         for image in self.images:
-            original_image =  imageio.imread(f"{self.image_directory}/{image}", as_gray=True)
-            if np.max(original_image) > 1.0:
-                # Scale to grayscale
-                original_image /= 255.
+
+            original_image =  color.rgb2gray(imageio.imread(f"{self.image_directory}/{image}"))
             self.method.process( original_image )
             if plot:
                 self.method.plot(original_image)
             self.save(image, self.method.output)
+
+            # original_image =  imageio.imread(f"{self.image_directory}/{image}", as_gray=True)
+            # if np.max(original_image) > 1.0:
+            #     # Scale to grayscale
+            #     original_image /= 255.
+            # self.method.process( original_image )
+            # if plot:
+            #     self.method.plot(original_image)
+            # self.save(image, self.method.output)
 
 
     def create_output_directory(self):
@@ -817,7 +881,7 @@ class ProcessContainer:
 if __name__ == '__main__':
     # Test out the functionality
 
-    image_directory = "RemoveBakelite_images"
+    image_directory = "WhiteBackgroundRemoval_RemoveBakelite_images"
 
     processes = [OtsuThreshold,
                  Threshold,
@@ -829,10 +893,14 @@ if __name__ == '__main__':
 
     processes = [RemoveBakelite, WhiteBackgroundRemoval,  OtsuThreshold]
 
-    processes = [ ScharrEdges ]
+    processes = [ GammaLogContrast, OtsuThreshold ]
 
-    for process in processes:
-        pc = ProcessContainer(process, image_directory)
+    processes = [RandomWalkerSegmentation]
+    
+    arguments = [{} for process in processes ] 
+    
+    for process, args in zip(processes, arguments):
+        pc = ProcessContainer(process, args, image_directory)
         pc.process_images(plot=True)
 
         image_directory = pc.dir_name
