@@ -26,7 +26,7 @@ from copy import copy, deepcopy
 from skimage import  feature, color, data, restoration, exposure, img_as_float, img_as_uint, img_as_ubyte, util
 from skimage.filters import threshold_otsu, threshold_sauvola, threshold_niblack, difference_of_gaussians, window, scharr, sobel, roberts
 from skimage.segmentation import random_walker
-
+from skimage.morphology import reconstruction
 
 from scipy.fftpack import fftn, fftshift, fft2, ifft2
 
@@ -416,7 +416,7 @@ class HistogramEquilization(ProcessImage):
         
         # Adaptive Equalization
         self.image_adapteq = exposure.equalize_adapthist(image, clip_limit=0.03)
-        self.output = self.image_adapteq
+        self.output = self.image_rescale
         
         
 
@@ -791,16 +791,23 @@ class RandomWalkerSegmentation(ProcessImage):
         self.name = "RandomWalkerSegmentation"
 
     def process(self, image):
-        import skimage
-
-        # Generate noisy synthetic data
-        sigma = 0.35
-
         # The range of the binary image spans over (-1, 1).
         # We choose the hottest and the coldest pixels as markers.
-        self.markers = np.zeros(image.shape, dtype=np.float)
-        self.markers[image < 0.05] = 1
-        self.markers[image > 0.95] = 2
+
+        image = img_as_float(image)
+        print(np.min(image), np.max(image))
+        image = exposure.rescale_intensity(image, in_range=(0, 1),
+                         out_range=(-1, 1))
+
+
+        self.markers = np.zeros(image.shape, dtype=np.uint)
+
+        self.markers[image < -0.85] = 1
+        self.markers[image > 0.85] = 2
+
+        print(np.min(image), np.max(image))
+        print(len(np.where(self.markers == 1)[0]))
+        print(len(np.where(self.markers == 2)[0]))
 
         # Run random walker algorithm
         self.output = random_walker(image, self.markers, beta=10, mode='bf')
@@ -812,7 +819,7 @@ class RandomWalkerSegmentation(ProcessImage):
         ax1.imshow(original_image, cmap='gray')
         ax1.axis('off')
         ax1.set_title('Noisy data')
-        ax2.imshow(self.markers, cmap='magma')
+        ax2.imshow(self.markers/2.0, cmap='magma')
         ax2.axis('off')
         ax2.set_title('Markers')
         ax3.imshow(self.output, cmap='gray')
@@ -823,6 +830,34 @@ class RandomWalkerSegmentation(ProcessImage):
         plt.show()
 
 
+
+######################################
+###---   Erosion segmentation   ---###
+######################################
+
+class ErosionSegmentation:
+    def __init__(self, args):
+        self.args = args
+        self.name = "ErosionSegmentation"
+
+    def process(self, image):
+
+        seed = np.copy(image)
+        seed[1:-1, 1:-1] = image.max()
+        self.output = reconstruction(seed, image, method='erosion')
+
+    def plot(self, original_image):
+        fig, ax = plt.subplots(2, 1, figsize=(6, 4), sharex=True, sharey=True)
+        ax = ax.ravel()
+
+        ax[0].imshow(original_image, cmap='gray')
+        ax[0].set_title('Original image')
+        ax[0].axis('off')
+
+        ax[1].imshow(self.output, cmap='gray')
+        ax[1].set_title('after filling holes')
+
+        plt.show()
 
 
 
@@ -881,7 +916,7 @@ class ProcessContainer:
 if __name__ == '__main__':
     # Test out the functionality
 
-    image_directory = "WhiteBackgroundRemoval_RemoveBakelite_images"
+    image_directory = "HistogramEquilization_WhiteBackgroundRemoval_RemoveBakelite_images"
 
     processes = [OtsuThreshold,
                  Threshold,
@@ -895,7 +930,7 @@ if __name__ == '__main__':
 
     processes = [ GammaLogContrast, OtsuThreshold ]
 
-    processes = [RandomWalkerSegmentation]
+    processes = [ RandomWalkerSegmentation]
     
     arguments = [{} for process in processes ] 
     

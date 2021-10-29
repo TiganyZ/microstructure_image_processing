@@ -30,3 +30,16 @@ Primarily, the way to go about performing the analysis is as follows:
 - This threshold is used itself as a way to analyse just the pixels coming beta/alpha
 
   
+* Strategies for detection of alpha-beta phases.
+
+  Multiple things can be done. One can fully segment between the
+  primary alpha and transformed beta grains, within the bakelite
+  microstructures. When thresholded, this provides a mask, through
+  which one can invert and analyse the inverted,
+  background-subtracted image.
+
+  One can apply the top-hat filter to remove small objects. This might
+  only be useful for small secondary alpha laths.
+
+  Random walker runs out of memory for segmentation of the phases on
+  my laptop. Might be worth to do it on the cluster.
