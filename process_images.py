@@ -802,8 +802,8 @@ class RandomWalkerSegmentation(ProcessImage):
 
         self.markers = np.zeros(image.shape, dtype=np.uint)
 
-        self.markers[image < -0.85] = 1
-        self.markers[image > 0.85] = 2
+        self.markers[image < -0.2] = 1
+        self.markers[image > 0.2] = 2
 
         print(np.min(image), np.max(image))
         print(len(np.where(self.markers == 1)[0]))
@@ -931,7 +931,9 @@ if __name__ == '__main__':
     processes = [ GammaLogContrast, OtsuThreshold ]
 
     processes = [ RandomWalkerSegmentation]
-    
+
+    #    processes = [ ErosionSegmentation ]
+
     arguments = [{} for process in processes ] 
     
     for process, args in zip(processes, arguments):
