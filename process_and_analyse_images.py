@@ -6,36 +6,55 @@ from process_images import *
 from analyse_images import *
 import sys
 
-# Get arguments from commandline
-if len(sys.argv) > 1:
-    # We have arguments
-    if len(sys.argv) > 2:
-        print("ERROR: Wrong number of arguments given.\n Please give directory of images")
-        exit(1)
-    else:
-        image_directory = sys.argv[1]
-else:
-    image_directory = "images"
+plot=False
+
+# # Get arguments from commandline
+# if len(sys.argv) > 1:
+#     # We have arguments
+#     if len(sys.argv) > 2:
+#         print("ERROR: Wrong number of arguments given.\n Please give directory of images")
+#         exit(1)
+#     else:
+#         image_directory = sys.argv[1]
+# else:
+#     image_directory = "images"
 
     
-print(f"Starting to process images from {image_directory}..")
+# print(f"Starting to process images from {image_directory}..")
 
+# # processes = [RemoveBakelite, WhiteBackgroundRemoval,  HistogramEquilization]
 
-processes = [RemoveBakelite, WhiteBackgroundRemoval,  OtsuThreshold]
-
-for process in processes:
-    pc = ProcessContainer(process, image_directory)
-
-    print("> Processing using {pc.method_name} method")
-    pc.process_images(plot=True)
+# processes = [ WhiteBackgroundRemoval,  OtsuThreshold]
+# arguments = [{} for process in processes ] 
     
-    image_directory = pc.dir_name
+
+
+
+# for process, args in zip(processes, arguments):
+#     pc = ProcessContainer(process, args, image_directory)
+
+#     print(f"> Processing using {pc.method_name} method")
+#     pc.process_images(plot=plot)
+    
+#     image_directory = pc.dir_name
+
+
+
+original_image_directory = "images_WhiteBackgroundRemoval"
+original_image_directory = "images"
+image_directory = "images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
 
 
 print(f"Analysing images from {image_directory}..")    
 # Now analyse
+print(f"> Alpha-beta fraction")    
 analysis = AlphaBetaFraction
-ac = AnalysisContainer(analysis, image_directory)
-ac.analyse_images(plot=True)
-    
+ac = AnalysisContainer(analysis, image_directory, original_image_directory)
+ac.analyse_images(plot=plot)
+
+# print(f"> Chris Alpha-beta fraction")    
+# analysis = ChrisAlphaBetaFraction
+# ac = AnalysisContainer(analysis, image_directory, original_image_directory)
+# ac.analyse_images(plot=plot)
+
 

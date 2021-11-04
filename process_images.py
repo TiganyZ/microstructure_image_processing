@@ -273,18 +273,64 @@ class RemoveBakelite(ProcessImage):
         sm1, sm2 = 0.1, 0.2
         
         expected =  (xm1, sm1, ym1,   xm2, sm2, ym2)
-        
-        params,cov=curve_fit(self.bimodal, x, y, expected)
 
-        mu1,sigma1,A1,mu2,sigma2,A2 = params
+        try:
+            params,cov=curve_fit(self.bimodal, x, y, expected)
+
+            mu1,sigma1,A1,mu2,sigma2,A2 = params
                 
-        x0 = np.array([(mu1 + mu2)/2.])
-        fnc = partial(self.bimodal, mu1=mu1,sigma1=sigma1,A1=A1, mu2=mu2,sigma2=sigma2,A2=A2)
-        method = 'Nelder-Mead'
-        ret =  minimize(fnc, x0, method=method, options={'disp': True, 'fatol': 1e-4})
+            x0 = np.array([(mu1 + mu2)/2.])
+            fnc = partial(self.bimodal, mu1=mu1,sigma1=sigma1,A1=A1, mu2=mu2,sigma2=sigma2,A2=A2)
+            method = 'Nelder-Mead'
+            ret =  minimize(fnc, x0, method=method, options={'disp': True, 'fatol': 1e-4})
 
-        return ret['x'][0], ret['fun']
+            return ret['x'][0], ret['fun']
+        except RuntimeError:
+            thresh = 0.6
+            print(f" Error finding bakelite: setting threshold of {thresh} ")
+            return thresh, 0
 
+    def calculate_boundary(self, image, sample_rate=10, offset = 0., n_sigma=3.):
+        # Sample from the top
+
+        # Here assuming reasonably high threshold for the analysis,
+        # such that all bakelite is black
+
+        height, width = image.shape
+
+        n_samples = int(width/float(sample_rate)) + 1
+        
+        surface_coordinates = np.zeros((n_samples, 2))
+        index = 0
+        idx_sample = 0
+        for i in range(width):
+            if i % sample_rate == 0:                
+                # Count the pixels which are black
+                n_black_pixels = 0
+                for j in range(height):
+                    if image[j,i] < 1e-3:
+                        # then black
+                        n_black_pixels += 1
+                    else:
+                        # Stop as soon as white pixel found
+                        break
+                surface_coordinates[idx_sample, 0] = i
+                surface_coordinates[idx_sample, 1] = n_black_pixels
+                idx_sample += 1
+
+        # Now calculate the statistics using the width of black pixels found.
+        sigma = np.std(surface_coordinates[:,1])
+        y_mean = np.mean(surface_coordinates[:,1])
+
+        lower_boundary = surface_coordinates[ :, 1] + n_sigma * sigma + offset
+
+        # y1 = surface_coordinates[ :, 1] + n_sigma * sigma + offset
+        # y2 = surface_coordinates[-1, 1] + n_sigma * sigma + offset
+
+        return lower_boundary
+        
+        
+        
     def remove_bakelite_pixels(self, image, thresholded_image, plot=False):
         # Take only the bakelite from the top of the image
         # This function takes in a thresholded image and then iterates over the top of the array
@@ -330,6 +376,123 @@ class RemoveBakelite(ProcessImage):
         # First fit a bimodal distribution to the image histogram
 
         self.thresh, value = self.fit_bimodal(image)
+
+        # The bottom gaussian corresponds to the black bakelite, therefore remove
+        self.output = self.remove_bakelite_pixels(image, img_as_float(image > self.thresh))
+        
+
+    def plot(self, original_image):
+        fig, axes = plt.subplots(ncols=3, figsize=(8, 2.5))
+        ax = axes.ravel()
+        ax[0] = plt.subplot(1, 3, 1)
+        ax[1] = plt.subplot(1, 3, 2)
+        ax[2] = plt.subplot(1, 3, 3, sharex=ax[0], sharey=ax[0])
+
+        ax[0].imshow(original_image, cmap=plt.cm.gray)
+        ax[0].set_title('Original')
+        ax[0].axis('off')
+
+        ax[1].hist(original_image.ravel(), bins=256)
+        ax[1].set_title('Histogram')
+        ax[1].axvline(self.thresh, color='r')
+
+        ax[2].imshow(self.output, cmap=plt.cm.gray)
+        ax[2].set_title('Thresholded')
+        ax[2].axis('off')
+
+        plt.show()
+        
+class RemoveBakeliteBoundary(ProcessImage):
+    def __init__(self, args={}):
+        self.args = args
+        self.name = "RemoveBakeliteBoundary"
+
+    def calculate_boundary(self, image, sample_rate=10, offset = 0., n_sigma=3.):
+        # Sample from the top
+
+        # Here assuming reasonably high threshold for the analysis,
+        # such that all bakelite is black
+
+        height, width = image.shape
+        max_pixel = np.max(image)
+        n_samples = int(width/float(sample_rate)) + 1
+        
+        surface_coordinates = np.zeros((n_samples, 2))
+        index = 0
+        idx_sample = 0
+        for i in range(width):
+            if i % sample_rate == 0:                
+                # Count the pixels which are black
+                depth = 0
+                for j in range(height):
+                    if np.isclose(image[j,i], max_pixel, 1e-3):
+                        break
+                    else:
+                        depth += 1
+                surface_coordinates[idx_sample, 0] = i
+                surface_coordinates[idx_sample, 1] = depth
+                idx_sample += 1
+
+        # Now calculate the statistics using the width of black pixels found.
+        sigma = np.std(surface_coordinates[:,1])
+        y_mean = np.mean(surface_coordinates[:,1])
+
+        lower_boundary = surface_coordinates[ :, 1] + n_sigma * sigma + offset
+
+        # y1 = surface_coordinates[ :, 1] + n_sigma * sigma + offset
+        # y2 = surface_coordinates[-1, 1] + n_sigma * sigma + offset
+
+        return surface_coordinates, lower_boundary
+        
+        
+        
+    def remove_bakelite_pixels(self, image, thresholded_image, plot=False):
+        # Take only the bakelite from the top of the image
+        # This function takes in a thresholded image and then iterates over the top of the array
+        new_image = deepcopy(image)
+        deleted = 0
+        boundary, lower_boundary = self.calculate_boundary(thresholded_image)
+        
+        for i,row in enumerate(thresholded_image):
+            if i > np.max(boundary[:,1]):
+                break
+
+            # Puttimg threshold here for the mean values of pixels, if 90% are black then remove
+            if i < np.min(boundary[:,1]):
+                # Then modify image by deleting the row
+                new_image = np.delete(new_image, i-deleted, 0)
+                deleted += 1
+        if plot:
+            fig, axes = plt.subplots(ncols=3, figsize=(8, 2.5))
+            ax = axes.ravel()
+            ax[0] = plt.subplot(1, 3, 1)
+            ax[1] = plt.subplot(1, 3, 2)
+            ax[2] = plt.subplot(1, 3, 3, sharex=ax[0], sharey=ax[0])
+
+            ax[0].imshow(image, cmap=plt.cm.gray)
+            ax[0].set_title('Original')
+            ax[0].axis('off')
+
+            ax[1].imshow(thresholded_image, cmap=plt.cm.gray)
+            ax[1].set_title('Thresholded')
+            ax[1].axis('off')
+
+            ax[2].imshow(new_image, cmap=plt.cm.gray)
+            ax[2].set_title('Removed Bakelite')
+
+            plt.show()
+        return new_image
+    
+    def process(self, image):
+        # Now the optimal threshold is the local minima between the
+        # bimodal distribution found in the histogram
+
+        # We can do this by finding each of the maxima and then using
+        # a minimisation algorithm
+
+        # First fit a bimodal distribution to the image histogram
+
+        self.thresh = 0.6
 
         # The bottom gaussian corresponds to the black bakelite, therefore remove
         self.output = self.remove_bakelite_pixels(image, img_as_float(image > self.thresh))
@@ -589,7 +752,7 @@ class WhiteBackgroundRemoval(ProcessImage):
 
     def process(self, image):
         image_inverted = util.invert(image)
-        background_inverted = restoration.rolling_ball(image_inverted, radius=120)
+        background_inverted = restoration.rolling_ball(image_inverted, radius=80)
 
         self.output = util.invert(image_inverted - background_inverted)
         self.output = img_as_float(self.output)
@@ -875,7 +1038,7 @@ class ProcessContainer:
 
     def process_images(self, plot=True):
         for image in self.images:
-
+            print(f" > processing {image}")
             original_image =  color.rgb2gray(imageio.imread(f"{self.image_directory}/{image}"))
             self.method.process( original_image )
             if plot:
@@ -896,7 +1059,7 @@ class ProcessContainer:
         # now = datetime.now()
         # dt = now.strftime("%Y-%m-%d--%H-%M-%S")
 
-        dir_name = f"{self.method_name}_{self.image_directory}"
+        dir_name = f"{self.image_directory}_{self.method_name}"
         if not os.path.exists(dir_name):
             os.mkdir(dir_name)
         return dir_name
@@ -904,7 +1067,8 @@ class ProcessContainer:
 
     def save(self, image_name, image):
         self.dir_name = self.create_output_directory()
-        path = os.path.join(self.dir_name, f"{self.method_name}_{image_name}")
+        filename, ext = os.path.splitext(os.path.basename(image_name))
+        path = os.path.join(self.dir_name, f"{filename}_{self.method_name}{ext}")
         
         print(f"> Saving processed image to {path}")
         imageio.imwrite(path, img_as_ubyte(image))
@@ -916,8 +1080,8 @@ class ProcessContainer:
 if __name__ == '__main__':
     # Test out the functionality
 
-    image_directory = "HistogramEquilization_WhiteBackgroundRemoval_RemoveBakelite_images"
-
+    image_directory="images"
+    
     processes = [OtsuThreshold,
                  Threshold,
                  DeconvoluteNoise,
