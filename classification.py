@@ -18,6 +18,59 @@ beta denudation in a sample could be encoded from a global gradient.
 
 We will use Bayes rule to compute this.
 
+Assumptions made about the volume fraction data: 
+
+- In the bulk, there is a gaussian distribution of volume fractions
+  around the mean 
+- In the surface region, there is a gaussian
+  distribution about a mean which decreases with depth
+
+
+We have a hierarchy of classifications: 
+* We must classify if the distribution of points corresponds to one of three hypothesis. 
+   - We have a prior which is biased in favour of denudation rather than no denudation/anti-denudation
+   - This specifies that we need to choose either between two classes for the data or one:
+     1. One class applies if one sees that the distribution of volume fractions is flat
+     2. Two classes apply if one sees that the distribution of volume fractions is not flat in given parts
+        - This applies to both the dendudation and anti-denudation hypotheses. 
+
+* To classify the data, one can either take it how it is, and see if a
+  given straight line can fit it, or
+
+* One can assume a gaussian which is distributed about the volume
+  fraction, (y-axis), therefore for each point, we can see if it resides within a given gaussian. 
+
+* We do not know what the bulk volume fraction is. How do we measure
+  this since the true bulk volume fraction depends on the hypothesis
+  chosen.
+* Is taking the data in its totality fair to make an assessment of the bulk volume fraction?
+
+* Really, this is a regression task, as the mean is a continuous
+  variable, and one can try to distinguish between the two models by
+  the variation of this parameter
+
+
+*** Testing between models/hypotheses for data ***
+- One can do a LDA to see if given points are within a given mean or not. 
+- The depth information will inform us also 
+
+One can do PCA (Principal Component Analysis) such that one can find the eigenvectors which maximise the variance of the class data. 
+
+
+* Instead of making things complicated, I can do something else: 
+- For the testing of denudation, I could split the data in half, and then fit two lines in the data. 
+- I can obtain an r value for each 
+- Then I can change the dividing line and do the same again. 
+
+
+* Classify can return a confidence of the fitting
+* The decision boundary should have the prior imposed, if we 
+
+
+We split the data set into testing and training. 
+One can do this multiple times, and perform statistics on a given dataset 
+
+
 """
 
 # Make an abstract base class which supplies a processing function upon an image
@@ -32,7 +85,119 @@ class DataClassification(ABC):
         pass
 
 
-class BayesClassifier
+class SegmentData:
+    def __init__(self, data, line):
+        self.data = data
+        self.line = line
+    
+    def segment_from_condition(self, cond):
+        i = np.arange(len(cond))[cond]
+
+        cond_data = np.zeros((len(cond), self.data.shape[1]))
+        cond_data[:,0] =  (self.data[:,0])[cond]
+        cond_data[:,1] =  (self.data[:,1])[cond]
+
+        return cond_data
+
+    def segment_data(self):
+        # Segment data naively, to classify the data into two sets,
+        # such that one can compare both.
+
+        before = self.data[:,1] <  self.line
+        after  = self.data[:,1] >= self.line
+
+        before_data = self.segment_from_condition(self.data, before)
+        after_data  = self.segment_from_condition(self.data, after )        
+
+        return before_data, after_data
+
+    
+class LinearFit:
+    def flat_line(self, x, c):
+        return c
+
+    def straight_line(self, x, m, c):
+        return m*x + c
+    
+    def fit_curve(self, data, expected, func):
+        x, y = data[:,0], data[:,1]
+        params,cov=curve_fit(func, x, y, expected)
+        stdevs = np.sqrt(np.diag(cov))
+        print(params)
+        return params, stdevs        
+
+    def flat(self, data):
+        d = { "data" : data,
+              "name" : "flat line"
+              "func" : self.flat_line,
+              "expected" : (0.7,)}
+        return d
+
+    def straight(self, data):
+        d = { "data" : data,
+              "name" : "straight line"
+              "func" : self.straight_line,
+              "expected" : (-1/2500., 0.7)}
+        return d
+    
+
+    def fit(self, data=None, func=None, expected=None, name=""):
+        try:
+           params, stdevs = self.fit_curve(data, expected, func) # self.exp_analysis()
+        except ValueError:
+            print(f"{name} fit: WARNING: Cannot fit to {name}, will give flat dependence for line")
+            params = expected
+            stdevs = np.array([1 for i in params])
+        return params, stdevs
+    
+
+class BayesianHypothesis(DataClassification):
+    def __init__(self, data):
+        self.fit = LinearFit()
+        self.data = data
+    
+    def compare_methods(self, linear_data, flat_data):
+        params_flat,     stdevs_flat     = self.fit(**self.flat(flat_data))
+        params_straight, stdevs_straight = self.fit(**self.straight(linear_data))
+
+        # compare the standard deviation between the points and see what fits better
+        std_fint = stdevs[0]
+        (std_lgrad, std_lint) = stdevs_straight[0], stdevs_straight[1]
+        
+        
+    def priors(self):
+        d = {
+            "straight" : 0.5,
+            "flat" : 0.4,
+            "neither" : 0.1
+             }
+        return d
+
+
+    # Possibly bootstrap the samples for the averages, 
+    
+    def posterior(self, prior, likelihood, evidence=1.0):
+        return likelihood * prior / evidence
+    
+    def bayesian_hypothesis_test(self):
+        prior = self.priors()
+
+        # Here we test the hypotheses, based on the data we botain
+        # Give initial line
+        line = (np.max(self.data[:,0]) - np.min(self.data[:,0])) / 2.
+        
+        segment = SegmentData(self.data, line)
+        before, after = segment.segment_data()
+
+        # What I can do actually is first split the data into train
+        # and test sets and then to the fitting, then quantify an error on each of the fits.
+
+        # This error for the fitting will be used to test the hypotheses
+
+        
+        
+class BayesClassifier(DataClassification):
+    
 
 
 class ClassificationContainer:
