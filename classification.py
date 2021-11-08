@@ -93,8 +93,54 @@ A method we can do is for each set of data:
 
 - But, one can compare the mean of the data can
 
-"""
 
+* Bayesian statistics
+
+Using a Bayesian approach, one gives distributions to each of the unknown quantities. 
+
+In our case, the quantity we want to determine is the threshold, given there is beta denudation. 
+
+We can perform bayesian analysis in multiple ways: 
+
+1. Hypothesis testing
+   - Our prior is the hypothesis that there is:
+     > Beta denudation
+     > Not beta denudation - flat distribution 
+     > Neither
+   - These are distributions which are of the mean value of the alpha volume fraction in a given region
+   - If we expect beta denudation, the prior would maybe be a gaussian which is centred quite high in terms of volume fraction
+   - We can assume a flat prior: for whatever mean value of alpha, we
+     expect beta denudation / not beta denudation to be equally likely
+      
+
+
+
+1. We can associate a posterior distribution which encodes
+   - Our prior belief that there is beta denudation in the samples tested
+     > We may assume a uniform distribution, that beta denudation is equally likely
+
+
+
+What we can do is find the threshold by using ROC AUC scores. 
+
+    1. Fit Model on the Training Dataset.
+    2. Predict Probabilities on the Test Dataset.
+    3. For each threshold in Thresholds:
+        3a. Convert probabilities to Class Labels using the threshold.
+        3b. Evaluate Class Labels.
+        3c. If Score is Better than Best Score.
+            3ci. Adopt Threshold.
+        4. Use Adopted Threshold When Making Class Predictions on New Data.
+
+
+
+
+"""
+from sklearn.datasets import make_classification
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_curve, f1_score
+from matplotlib import pyplot
 
 
 
@@ -110,6 +156,76 @@ class DataClassification(ABC):
         pass
 
 
+class ThresholdDetermination:
+
+    def brute_force(self, x, y):
+        trainX, testX, trainy, testy = train_test_split(X, y, test_size=0.5, random_state=2, stratify=y)
+        model = LogisticRegression(solver='lbfgs')
+        model.fit(trainX, trainy)
+        # predict probabilities
+        yhat = model.predict_proba(testX)
+        # keep probabilities for the positive outcome only
+        yhat = yhat[:, 1]
+
+        # define thresholds
+        thresholds = arange(0, 1, 0.001)
+        # evaluate each threshold
+        scores = [f1_score(testy, to_labels(probs, t)) for t in thresholds]
+        # get best threshold
+        ix = argmax(scores)
+        print('Threshold=%.3f, F-Score=%.5f' % (thresholds[ix], scores[ix]))
+        best_thresh = thresholds[ix]
+        print('Best Threshold=%f' % (best_thresh))
+        return best_thresh
+
+    def plot(self):
+        # plot the roc curve for the model
+        plt.plot([0,1], [0,1], linestyle='--', label='No Skill')
+        plt.plot(self.fpr, self.tpr, marker='.', label='Logistic')
+        # axis labels
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.legend()
+        # show the plot
+        plt.show()
+
+class ROCThresholdDetermination:    
+    def roc_auc_analysis(self, x, y):
+        # roc curve for logistic regression model
+        # generate dataset
+        # X, y = make_classification(n_samples=10000, n_features=2, n_redundant=0,
+        #         n_clusters_per_class=1, weights=[0.99], flip_y=0, random_state=4)
+        # split into train/test sets
+        trainX, testX, trainy, testy = train_test_split(X, y, test_size=0.5, random_state=2, stratify=y)
+        # fit a model
+        model = LogisticRegression(solver='lbfgs')
+        model.fit(trainX, trainy)
+        # predict probabilities
+        yhat = model.predict_proba(testX)
+        # keep probabilities for the positive outcome only
+        yhat = yhat[:, 1]
+        # calculate roc curves
+        self.fpr, self.tpr, thresholds = roc_curve(testy, yhat)
+    
+        # get the best threshold using J statistic 
+        J = self.tpr - self.fpr
+        ix = argmax(J)
+        best_thresh = thresholds[ix]
+        print('Best Threshold=%f' % (best_thresh))
+        return best_thresh
+
+    def plot(self):
+        # plot the roc curve for the model
+        plt.plot([0,1], [0,1], linestyle='--', label='No Skill')
+        plt.plot(self.fpr, self.tpr, marker='.', label='Logistic')
+        # axis labels
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.legend()
+        # show the plot
+        plt.show()
+    
+        
 class SegmentData:
     def __init__(self, data, line):
         self.data = data
