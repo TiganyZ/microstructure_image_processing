@@ -71,7 +71,32 @@ We split the data set into testing and training.
 One can do this multiple times, and perform statistics on a given dataset 
 
 
+A method we can do is for each set of data:
+- Segment data into training, test and validation sets
+- Try a threshold to classify two data sets
+- Perform logistic regression or a t-test to see if the difference in the means is significant
+  - Logistic regression gives a likelihood for a given classification
+  - We can optimise the logistic regression to get the threshold which corresponds to the maximum likelihood
+- If the means are significant, fit lines to the data
+  - Fit a linear regression to the first set, and a flat distribution to the second
+
+- Can look at type of R squared relationship (SS(mean)-SS(fit)) /
+  SS(mean), to see how well the fit is compared to the mean. (how good
+  of a predictor)
+
+- We can see if the R squared value of a mean over the whole data is better than the segmentation over the whole
+- This will always be in favour of the two models as there are two regressions which minimise each of squares.
+
+- For logistic regression, once we have the fit, and the quantities
+  for the pseudo-R-squared, then we can find a p value
+  (2(LL(fit)-LL(mean))) which corresponds to a point on a Chi-squared distribution
+
+- But, one can compare the mean of the data can
+
 """
+
+
+
 
 # Make an abstract base class which supplies a processing function upon an image
 class DataClassification(ABC):
