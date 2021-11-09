@@ -133,7 +133,129 @@ What we can do is find the threshold by using ROC AUC scores.
         4. Use Adopted Threshold When Making Class Predictions on New Data.
 
 
+To actually pick a threshold, one can use the training data, to see if
+such a threshold exists. Prior to this, it must be possible to see a
+trend in the data.
 
+There will be a distribution of the thresholds that we can choose, we
+can choose the one which minimises the error on the fit statistics. 
+
+One must first be able to determine if there is really beta denudation in the training data
+
+As such we can do hypothesis testing which is available to use through a bayesian framework. 
+
+We can test the general trend of the data and ask scientific questions about this trend: 
+
+- We can see the gradient of this trend which we obtain by fitting the test data
+  > With the bayesian method, we can see there will be a distribution of potential gradients which one could obtain 
+  > This distribution is based on the prior distribution we associate to it, which will be flat
+  > We can test to see if a given gradient value, or greater, is 
+
+
+We want
+
+P(Denudation | gradient) = P(gradient | denudation) * P(denudation) / P(gradient)
+
+
+Remember that the first parameters, are the ones which are being varied. 
+
+So we have a given prior which is P(denudation), which gives a distribution over the possible gradients of what we expect is denudated. 
+
+We can expect that 
+P(denudation) = 0 if gradient is > 0
+P(denudation) = exponential distribution if gradient < 0
+              = Some logistic curve which is is centred around some negative gradient
+
+The data likelihood, P(gradient | denudation) is the distribution/likelihood of gradients which we have got from the data given that there is denudation. 
+
+We can introduce a denudation parameter, which encodes the information
+that there is maximal denudation when the gradient is negative
+infinity, and 0 when the gradient is zero.
+
+To get the likelihood, we first assume a statistical model.
+
+We can assume that the gradients drawn are from a gaussian probability distribution, from the data we can obtain 
+We can use a logistic curve as the probability that there is denudation
+
+
+As such we can assume the likelihood function, which gives the likelihood of a gradient, given an amount of denudation.
+
+One can actually get a denudation distribution given the gradients which are found. This is what we would like to determine. 
+
+
+
+The likelihood function can be generated from the points sampled, we must assume a distribution. 
+Say the points are sampled from a distribution, then we can say that 
+
+
+
+Given denudation, we expect a gaussian distribution of gradients,
+which we can obtain in the usual way: a gaussian which is defined from
+the fit statistics from the testing data. 
+
+We need to construct the likelihood function. We can do this is a similar way as for a coin-flip test. 
+
+We can assume that the target variable is distributed with gaussian noise, which is logical. 
+P(t | X, w^T.\phi(x), beta^-1)
+
+P(gradient | denudation ) is a likelihood function which states that,
+given that the amount of denudation can vary, say a denudation parameter, how likely is a given gradient? 
+
+
+Assuming that we can pick the gradient from a normal distribution, this is the observation yi from the data
+We measure a gradient, which has a particular error associated with it
+
+The likelihood will take 
+
+We can assume that the 
+
+If we vary the gradient, what is the likelihood of the denudation?
+
+We expect the gradients sampled to be from a normal distribution. 
+
+This means, for a given sample, assuming they are independent and
+identically distributed, the likelihood function will be the joint
+probability distribution from a sampled gradient, which will be a product of gaussians. 
+
+We can actually obtain from all of the data, a prediction of denudation given gradient information from samples of the alpha beta fraction.
+
+One could create an adversarial network to do this. 
+
+--------------------------------------------------
+--------------- Types of modelling ---------------
+--------------------------------------------------
+
+--------------------
+Supervised learning
+--------------------
+
+- Given the dataset, we can train the predictive model on a subset of the data. 
+
+- This model can then predict, given data, which we fit a line to,
+  which has a particular gradient, how likely it is that there is beta denudation.
+
+- This would necessitate human input of which images are denudated and which aren't. 
+
+--------------------------------------------------
+
+--------------------
+Denudation detection
+--------------------
+
+- To classify if there is denudation, we can have two hypothesis with given probabilities
+1. P(Denudation    | data) = P(data |    Denudation) * P(   Denudation)
+2. P(No Denudation | data) = P(data | No Denudation) * P(No Denudation)
+
+
+What does this mean:
+1. P(data |    Denudation) = P(Denudation    | data) * P(data)
+2. P(data | No Denudation) = P(No Denudation | data) * P(data)
+
+How likely is the data we have, given that there is denudation. 
+We need to have a model for denudation such that we can estimate the likelihood. 
+
+- If hypothesis 1 is greater than 2, then we have denudation. 
+- 
 
 """
 from sklearn.datasets import make_classification
