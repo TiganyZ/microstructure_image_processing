@@ -243,19 +243,42 @@ Denudation detection
 --------------------
 
 - To classify if there is denudation, we can have two hypothesis with given probabilities
-1. P(Denudation    | data) = P(data |    Denudation) * P(   Denudation)
-2. P(No Denudation | data) = P(data | No Denudation) * P(No Denudation)
+1. P(Denudation    | data) = P(data |    Denudation) * P(   Denudation)   =>  P(H0|Y=y) = f(y|H0).P(H0)/P(y)
+2. P(No Denudation | data) = P(data | No Denudation) * P(No Denudation)   =>  P(H1|Y=y) = f(y|H1).P(H1)/P(y)
+
+- Now we know the distribution of the data that we expect, under the two different hypotheses
+  > We would expect that there is a gradient in the fit of the data which is negative
+  > What is the likelihood function / the distribution that we assume?
+  > We can assume that the 
+> This means we know the likelihood function/distribution of P(data | H)
 
 
-What does this mean:
-1. P(data |    Denudation) = P(Denudation    | data) * P(data)
-2. P(data | No Denudation) = P(No Denudation | data) * P(data)
+--- Denudation Hypothesis ---
+- Assume that the distribution is 
 
 How likely is the data we have, given that there is denudation. 
 We need to have a model for denudation such that we can estimate the likelihood. 
 
 - If hypothesis 1 is greater than 2, then we have denudation. 
 - 
+
+Globally, given gradients from all of the data, one can define this: 
+1. P(data |    Denudation) = P(Denudation    | data) * P(data)
+2. P(data | No Denudation) = P(No Denudation | data) * P(data)
+
+Which are the gradients found form each sample. 
+1. P(g1, g2, g3,..., gn; threshold |    Denudation) = P(Denudation    | g1, g2, g3,..., gn; threshold) * P(g1, g2, g3,..., gn; threshold)
+2. P(g1, g2, g3,..., gn; threshold | No Denudation) = P(No Denudation | g1, g2, g3,..., gn; threshold) * P(g1, g2, g3,..., gn; threshold)
+
+
+- Here, we know that the likelihood function will be a joint distribution 
+- We can assume different distributions, say 
+  > Binomial distribution which is if there is denudation observed or not
+  > 
+- We vary the denudation parameter, to see how the likelihood of the data changes
+- We know that 
+
+
 
 """
 from sklearn.datasets import make_classification
