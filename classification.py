@@ -243,13 +243,43 @@ Denudation detection
 --------------------
 
 - To classify if there is denudation, we can have two hypothesis with given probabilities
-1. P(Denudation    | data) = P(data |    Denudation) * P(   Denudation)   =>  P(H0|Y=y) = f(y|H0).P(H0)/P(y)
-2. P(No Denudation | data) = P(data | No Denudation) * P(No Denudation)   =>  P(H1|Y=y) = f(y|H1).P(H1)/P(y)
+1. P(Denudation    | data) = P(data |    Denudation) * P(   Denudation) /P(data)  =>  P(H0|Y=y) = f(y|H0).P(H0)/P(y)
+2. P(No Denudation | data) = P(data | No Denudation) * P(No Denudation) /P(data)  =>  P(H1|Y=y) = f(y|H1).P(H1)/P(y)
+
+Say Denudation => Y=1
+ No Denudation => Y=0
+
+1. P(Y=1 | data) = P(data |Y=0) * P(Y=1)/P(data)
+2. P(Y=0 | data) = P(data |Y=1) * P(Y=0)/P(data)
+
+____ Do the above with logistic function as the likelihood? ____
+
+- Problem is, we need to know the actual supervised vaues to train the
+  logistic regression on, such that we can even do the hypothesis
+  testing. Therefore, we can classify if each of the images are
+  denudated or not, by human eye, then use this to train the logistic
+  regression. Then, we can test the model on the rest of the data and see the predictions.
+
 
 - Now we know the distribution of the data that we expect, under the two different hypotheses
   > We would expect that there is a gradient in the fit of the data which is negative
   > What is the likelihood function / the distribution that we assume?
-  > We can assume that the 
+  > We can assume that the denudation a function which
+    - If the gradient is less than 0, then there is a very small chance that there is 
+  > This actually logistic regression if we do this! As we assume that the likelihood is a logistic function: 
+    - The likelihood function we have is:
+    - L(theta) = \P_i=1..N P(Y=1|x=xi ; theta) * \P_i=1..N (1 - P(Y=1|x=xi ; theta) )
+
+- We assume the model that P(y=1|x=xi) = \sigma(theta_0 + theta_1 * x)
+  > Where \sigma(z) = 1 / (1 + e^{-z})
+  > Now we can find the likelihood function which will be 
+
+Lets now find the likelihood function and then minmise by minimising the negative log likelihood
+
+-log( L(theta) ) =  −∑i=1...N  yi * log(P(Yi=1|X=x;Θ)) + (1−yi) log(P(Yi=0|X=x;Θ))
+
+
+ 
 > This means we know the likelihood function/distribution of P(data | H)
 
 
@@ -276,9 +306,7 @@ Which are the gradients found form each sample.
   > Binomial distribution which is if there is denudation observed or not
   > 
 - We vary the denudation parameter, to see how the likelihood of the data changes
-- We know that 
-
-
+- We know that
 
 """
 from sklearn.datasets import make_classification
@@ -437,6 +465,15 @@ class LinearFit:
         return params, stdevs
     
 
+class BayesianLogisticHypothesis(DataClassification):
+    def __init__(self, data):
+        self.fit = LinearFit()
+        self.data = data
+
+    # Now train the model on the data
+
+    
+    
 class BayesianHypothesis(DataClassification):
     def __init__(self, data):
         self.fit = LinearFit()
