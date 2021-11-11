@@ -308,14 +308,33 @@ Which are the gradients found form each sample.
 - We vary the denudation parameter, to see how the likelihood of the data changes
 - We know that
 
+
+
+----------------------------------------
+           Testing the data
+----------------------------------------
+Models to test:
+- Logistic regression
+- Support vector machines 
+
+Procedure:
+ 1) Get gradient data for the dataset as a first measure: just a simple straight line per dataset. 
+   - For a more involved approach, we can fit a curve to the data using a linear regression with basis functions. 
+ 2) Split the full dataset (the human-classified denudation data) into train and test sets
+ 3) Use k-fold cross validation on the models to get scores 
+    - Best threshold from the ROC curve can be done for each curve
+ 5) Test the model on the test dataset to provide an arror. 
+ 6) Interpret the models, in terms of bayes theorem, for what it means. 
+
+
 """
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve, f1_score
 from matplotlib import pyplot
-
-
+from sklearn import preprocessing
+from sklearn.model_selection import StratifiedKFold, KFold
 
 # Make an abstract base class which supplies a processing function upon an image
 class DataClassification(ABC):
@@ -328,56 +347,39 @@ class DataClassification(ABC):
     def plot(self, data):
         pass
 
+    
+# Make an abstract base class which supplies a processing function upon an image
+class DataAnalysis(ABC):
+    
+    @abstractmethod
+    def analyse(self, image):
+        pass
+            
+    @abstractmethod
+    def plot(self, image):
+        pass
 
-class ThresholdDetermination:
+        
+class ROCThresholdDetermination(DataAnalysis):
+    def __init__(self, X, y, model=LogisticRegression(solver='lbfgs'), test_size = 0.3):
+        self.X = X
+        self.y = y
+        self.model = model
+        self.test_size = test_size
+        
 
-    def brute_force(self, x, y):
-        trainX, testX, trainy, testy = train_test_split(X, y, test_size=0.5, random_state=2, stratify=y)
-        model = LogisticRegression(solver='lbfgs')
-        model.fit(trainX, trainy)
-        # predict probabilities
-        yhat = model.predict_proba(testX)
-        # keep probabilities for the positive outcome only
-        yhat = yhat[:, 1]
-
-        # define thresholds
-        thresholds = arange(0, 1, 0.001)
-        # evaluate each threshold
-        scores = [f1_score(testy, to_labels(probs, t)) for t in thresholds]
-        # get best threshold
-        ix = argmax(scores)
-        print('Threshold=%.3f, F-Score=%.5f' % (thresholds[ix], scores[ix]))
-        best_thresh = thresholds[ix]
-        print('Best Threshold=%f' % (best_thresh))
-        return best_thresh
-
-    def plot(self):
-        # plot the roc curve for the model
-        plt.plot([0,1], [0,1], linestyle='--', label='No Skill')
-        plt.plot(self.fpr, self.tpr, marker='.', label='Logistic')
-        # axis labels
-        plt.xlabel('False Positive Rate')
-        plt.ylabel('True Positive Rate')
-        plt.legend()
-        # show the plot
-        plt.show()
-
-class ROCThresholdDetermination:    
-    def roc_auc_analysis(self, x, y):
+    
+    def analysis(self):
         # roc curve for logistic regression model
-        # generate dataset
-        # X, y = make_classification(n_samples=10000, n_features=2, n_redundant=0,
-        #         n_clusters_per_class=1, weights=[0.99], flip_y=0, random_state=4)
         # split into train/test sets
-        trainX, testX, trainy, testy = train_test_split(X, y, test_size=0.5, random_state=2, stratify=y)
+        
+        trainX, testX, trainy, testy = train_test_split(self.X, self.y, test_size=self.test_size, random_state=2, stratify=y)
         # fit a model
-        model = LogisticRegression(solver='lbfgs')
         model.fit(trainX, trainy)
-        # predict probabilities
         yhat = model.predict_proba(testX)
+
         # keep probabilities for the positive outcome only
         yhat = yhat[:, 1]
-        # calculate roc curves
         self.fpr, self.tpr, thresholds = roc_curve(testy, yhat)
     
         # get the best threshold using J statistic 
@@ -385,6 +387,7 @@ class ROCThresholdDetermination:
         ix = argmax(J)
         best_thresh = thresholds[ix]
         print('Best Threshold=%f' % (best_thresh))
+        self.threshold = self.best_thresh
         return best_thresh
 
     def plot(self):
@@ -397,72 +400,6 @@ class ROCThresholdDetermination:
         plt.legend()
         # show the plot
         plt.show()
-    
-        
-class SegmentData:
-    def __init__(self, data, line):
-        self.data = data
-        self.line = line
-    
-    def segment_from_condition(self, cond):
-        i = np.arange(len(cond))[cond]
-
-        cond_data = np.zeros((len(cond), self.data.shape[1]))
-        cond_data[:,0] =  (self.data[:,0])[cond]
-        cond_data[:,1] =  (self.data[:,1])[cond]
-
-        return cond_data
-
-    def segment_data(self):
-        # Segment data naively, to classify the data into two sets,
-        # such that one can compare both.
-
-        before = self.data[:,1] <  self.line
-        after  = self.data[:,1] >= self.line
-
-        before_data = self.segment_from_condition(self.data, before)
-        after_data  = self.segment_from_condition(self.data, after )        
-
-        return before_data, after_data
-
-    
-class LinearFit:
-    def flat_line(self, x, c):
-        return c
-
-    def straight_line(self, x, m, c):
-        return m*x + c
-    
-    def fit_curve(self, data, expected, func):
-        x, y = data[:,0], data[:,1]
-        params,cov=curve_fit(func, x, y, expected)
-        stdevs = np.sqrt(np.diag(cov))
-        print(params)
-        return params, stdevs        
-
-    def flat(self, data):
-        d = { "data" : data,
-              "name" : "flat line"
-              "func" : self.flat_line,
-              "expected" : (0.7,)}
-        return d
-
-    def straight(self, data):
-        d = { "data" : data,
-              "name" : "straight line"
-              "func" : self.straight_line,
-              "expected" : (-1/2500., 0.7)}
-        return d
-    
-
-    def fit(self, data=None, func=None, expected=None, name=""):
-        try:
-           params, stdevs = self.fit_curve(data, expected, func) # self.exp_analysis()
-        except ValueError:
-            print(f"{name} fit: WARNING: Cannot fit to {name}, will give flat dependence for line")
-            params = expected
-            stdevs = np.array([1 for i in params])
-        return params, stdevs
     
 
 class BayesianLogisticHypothesis(DataClassification):
@@ -471,24 +408,7 @@ class BayesianLogisticHypothesis(DataClassification):
         self.data = data
 
     # Now train the model on the data
-
-    
-    
-class BayesianHypothesis(DataClassification):
-    def __init__(self, data):
-        self.fit = LinearFit()
-        self.data = data
-    
-    def compare_methods(self, linear_data, flat_data):
-        params_flat,     stdevs_flat     = self.fit(**self.flat(flat_data))
-        params_straight, stdevs_straight = self.fit(**self.straight(linear_data))
-
-        # compare the standard deviation between the points and see what fits better
-        std_fint = stdevs[0]
-        (std_lgrad, std_lint) = stdevs_straight[0], stdevs_straight[1]
-        
-        
-    def priors(self):
+   def priors(self):
         d = {
             "straight" : 0.5,
             "flat" : 0.4,
@@ -502,27 +422,49 @@ class BayesianHypothesis(DataClassification):
     def posterior(self, prior, likelihood, evidence=1.0):
         return likelihood * prior / evidence
     
-    def bayesian_hypothesis_test(self):
-        prior = self.priors()
 
-        # Here we test the hypotheses, based on the data we botain
-        # Give initial line
-        line = (np.max(self.data[:,0]) - np.min(self.data[:,0])) / 2.
+class Container:
+    def __init__(self, classified_image_data : str, volume_fraction_data_directory : str, image_directory : str):
+        # Defining the classes which will help with the logistic regression:
+        # 1. The ROC optimisation for the logistic regression to find the best threshold.
+
+        self.image_directory = image_directory
+        self.volume_fraction_data_directory = volume_fraction_data_directory
         
-        segment = SegmentData(self.data, line)
-        before, after = segment.segment_data()
+        self.images_classified = np.loadtxt(classified_image_data, usecols=[0], dtype=np.str)
+        self.denudation_classification = np.loadtxt(classified_image_data, usecols=[1], dtype=np.int)
 
-        # What I can do actually is first split the data into train
-        # and test sets and then to the fitting, then quantify an error on each of the fits.
-
-        # This error for the fitting will be used to test the hypotheses
+        # Preprocess the data to provide a simple linear fit to the
+        # pixel depth. Maybe split the data into two halves and then
+        # take the gradient / the ratio between them too, we can see
+        # how they vary as predictors
 
         
+        cv = ShuffleSplit(n_splits=5, test_size=0.3, random_state=0)
+        scaler = preprocessing.StandardScaler().fit(X_train)
+        X_train_transformed = scaler.transform(X_train)
+        clf = svm.SVC(C=1).fit(X_train_transformed, y_train)
+        X_test_transformed = scaler.transform(X_test)
+        clf.score(X_test_transformed, y_test)
         
-class BayesClassifier(DataClassification):
+        
+        self.roc = ROCThresholdDetermination()
     
+    def get_features(self, data_file, mode='a'):
+        feature_extraction = FitSegmentData(data)
 
+        
+   def get_filename_from_id(self, name):
+        
+        analysis_name = os.path.splitext(name.split('_')[0])[0]
+        base_name = os.path.splitext(name.split('_')[1])[0]
+        extension = os.path.splitext(name)[1]
+        prefixed = [filename for filename in os.listdir(self.image_directory) if filename.startswith(base_name)]
 
+        # Assuming just one identifier from image name, can't deal with multiple images'
+        print("Unprocessed image: ", prefixed[0])
+        return prefixed[0]
+    
 class ClassificationContainer:
     def __init__(self, classification_method: Type[DataClassification], data_directory: str, image_directory: str):
         self.data_directory = data_directory
