@@ -164,6 +164,91 @@ class BisectionFit(DataAnalysis):
         plt.show()
         
         
+class MultisectionFit(DataAnalysis):
+    def __init__(self):
+        self.fit = LinearFit()
+        self.name = "MultisectionFit"
+        self.comment = "# Gradient_from_surface[ab_frac/pixel] mean_in_bulk[ab_frac] surface_bulk_ratio"
+
+    def compare_methods(self, linear_data, flat_data):
+        self.params_flat,     self.stdevs_flat     = self.fit.fit(**self.fit.flat(flat_data))
+        self.params_straight, self.stdevs_straight = self.fit.fit(**self.fit.straight(linear_data))
+
+        # compare the standard deviation between the points and see what fits better
+        # Extent of data before
+        mean_fit = (  self.fit.straight_line( self.before[ 0,0], self.params_straight[0], self.params_straight[1])
+                    + self.fit.straight_line( self.before[-1,0], self.params_straight[0], self.params_straight[1]) ) / 2
+        f_data = self.params_flat[0], self.stdevs_flat[0]
+        s_data_g, s_data_i = (self.params_straight[0], self.stdevs_straight[0]), (self.params_straight[1], self.stdevs_straight[1])
+
+        # self.data = "{self.params_straight[0]} {self.stdevs_straight[0]} {self.params_straight[1]} {self.stdevs_straight[0]} {self.params_flat[0]} {self.stdevs_flat[0]} \n"
+
+        self.data = f"{self.params_straight[0]} {self.params_flat[0]} {mean_fit/self.params_flat[0]}\n"
+        return f_data, s_data_g, s_data_i
+        
+
+    def analyse(self, data):
+        self.original_data = data
+        # Here we test the hypotheses, based on the data we botain
+        # Give initial line
+        line = (np.max(self.original_data[:,0]) + np.min(self.original_data[:,0])) / 2.
+        
+        segment = SegmentData(self.original_data, line)
+        self.before, self.after = segment.segment_data()
+
+        line = (np.max(self.before[:,0]) + np.min(self.before[:,0])) / 2.
+        segment2 = SegmentData(self.before, line)
+        self.before1, self.before2 = segment2.segment_data()
+
+
+        line = (np.max(self.before1[:,0]) + np.min(self.before1[:,0])) / 2.
+        segment2 = SegmentData(self.before1, line)
+        self.before, self.before12 = segment2.segment_data()
+        
+        
+        # On the segmented data I could do cross validation to find
+        # the best model and error. This can determine the threshold.
+
+        return self.compare_methods(self.before, self.after)
+
+
+    def plot(self, original_image):
+        fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 3))
+        ax[0].imshow(original_image, cmap='gray')
+        ax[0].set_title('Original image')
+        ax[0].axis('off')
+
+        ax[1].plot(self.original_data[:,0], self.original_data[:,1])
+
+        yb  = self.fit.straight_line(self.before[:,0], self.params_straight[0], self.params_straight[1])
+        yb1 = self.fit.straight_line(self.before[:,0], self.params_straight[0] + self.stdevs_straight[0], self.params_straight[1] + self.stdevs_straight[1])
+        yb2 = self.fit.straight_line(self.before[:,0], self.params_straight[0] - self.stdevs_straight[0], self.params_straight[1] - self.stdevs_straight[1])
+
+
+        ya  = np.array( [ self.fit.flat_line(val, self.params_flat[0])                       for val in self.after[:,0] ] )
+        ya1 = np.array( [ self.fit.flat_line(val, self.params_flat[0] + self.stdevs_flat[0]) for val in self.after[:,0] ] )
+        ya2 = np.array( [ self.fit.flat_line(val, self.params_flat[0] - self.stdevs_flat[0]) for val in self.after[:,0] ] )
+
+        
+        ax[1].plot(self.before[:,0], yb, 'r-')
+        ax[1].plot(self.before[:,0], yb1, 'g--')
+        ax[1].plot(self.before[:,0], yb2, 'g--')
+        ax[1].fill_between(self.before[:,0], yb1, yb2, facecolor="gray", alpha=0.15)
+
+        print("Segmented data: ",self.before.shape, self.after.shape)
+        ax[1].plot(self.after[:,0], ya, 'b-')
+        ax[1].plot(self.after[:,0], ya1, 'm--')
+        ax[1].plot(self.after[:,0], ya2, 'm--')
+        ax[1].fill_between(self.after[:,0], ya1, ya2, facecolor="gray", alpha=0.15)
+
+        
+        ax[1].set_xlabel("Surface Depth")
+        ax[1].set_ylabel("Alpha-beta fraction")        
+        ax[1].set_title('Alpha-beta volume fraction with surface depth')
+        fig.tight_layout()
+        plt.show()
+        
+        
 
         
     
@@ -265,14 +350,14 @@ class PreprocessContainer:
 
 if __name__ == "__main__":
 
-    plot=False #True
+    plot=0 # False #True
     image_directory =  "images" #"images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
     data_directory = "AlphaBetaFraction_2021-11-04--09-37-03_images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
     denudation_data = "denudation_data.dat"
     print(f"Preprocessing data from {data_directory}, with images from {image_directory}..")
     # Now analyse
     print(f"> Gradient data from alpha-beta fraction")
-    analysis = BisectionFit
+    analysis =  MultisectionFit #BisectionFit
     ac = PreprocessContainer(analysis, image_directory, data_directory, denudation_data)
     ac.analyse_images(plot=plot)
 

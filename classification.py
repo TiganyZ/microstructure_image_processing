@@ -328,15 +328,25 @@ Procedure:
 
 
 """
+from abc import ABC, abstractmethod
+import os
+from typing import Type, TypeVar
+import numpy as np
+
+from datetime import datetime
+
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve, f1_score
-from sklearn import svm,  cross_validation
-from matplotlib import pyplot
+from sklearn.model_selection import cross_val_score
+from sklearn import svm
+import matplotlib.pyplot as plt
 from sklearn import preprocessing
 from sklearn.model_selection import StratifiedKFold, KFold
 
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 # Make an abstract base class which supplies a processing function upon an image
 class DataTrainer(ABC):
     
@@ -386,7 +396,7 @@ class ROCThresholdDetermination(DataAnalysis):
         # roc curve for logistic regression model
         # split into train/test sets
         
-        trainX, testX, trainy, testy = train_test_split(self.X, self.y, test_size=self.test_size, random_state=2, stratify=y)
+        #trainX, testX, trainy, testy = train_test_split(self.X, self.y, test_size=self.test_size, random_state=2, stratify=y)
         # fit a model
         model.fit(trainX, trainy)
         yhat = model.predict_proba(testX)
@@ -421,7 +431,7 @@ class BayesianLogisticHypothesis(DataClassification):
         self.data = data
 
     # Now train the model on the data
-   def priors(self):
+    def priors(self):
         d = {
             "straight" : 0.5,
             "flat" : 0.4,
@@ -429,66 +439,137 @@ class BayesianLogisticHypothesis(DataClassification):
              }
         return d
 
-
-    # Possibly bootstrap the samples for the averages, 
-    
     def posterior(self, prior, likelihood, evidence=1.0):
         return likelihood * prior / evidence
+
+
     
+class TrainSVM(DataTrainer):
+    def __init__(self):
+        self.name = "Logistic Regression"
+
+    def train(self, X, y):
+        self.model = svm.SVC(kernel='linear', C=1, random_state=42,probability=True ).fit(X,y)
+        scores = cross_val_score(self.model, X, y, cv=5)
+        print("%0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
+        return self.model, scores.mean()
+    
+    def plot(self, X_test, X_original, y):
+
+        # Plot the test data, the logistic regression curve and the ROC
+        
+        #fig, ax = plt.subplots(nrows=len(X_test.T), ncols=2, figsize=(8, 3*len(X_test.T)))
+
+        probs = self.model.predict_proba(X_test)
+        
+  
+        fig, ax = plt.subplots(ncols=3, figsize=(12, 3))
 
 
+        ax[0].scatter(X_test[:,0], X_test[:,1], c=y)
+        ax[0].set_xlabel("Surface gradient")
+        ax[0].set_ylabel("Surface to bulk ratio")            
+
+
+        xlim = ax[0].get_xlim()
+        ylim = ax[0].get_ylim()
+
+        # create grid to evaluate model
+        xx = np.linspace(xlim[0], xlim[1], 30)
+        yy = np.linspace(ylim[0], ylim[1], 30)
+        YY, XX = np.meshgrid(yy, xx)
+        xy = np.vstack([XX.ravel(), YY.ravel()]).T
+        Z = self.model.decision_function(xy).reshape(XX.shape)
+
+
+        # plot decision boundary and margins
+        ax[0].contour(
+            XX, YY, Z, colors="k", levels=[-1, 0, 1], alpha=0.5, linestyles=["--", "-", "--"]
+        )
+        # plot support vectors
+        ax[0].scatter(
+            self.model.support_vectors_[:, 0],
+            self.model.support_vectors_[:, 1],
+            s=10,
+            linewidth=1,
+            facecolors="none",
+            edgecolors="k",
+        )
+
+        ax[1].plot(X_original[:,0], probs[:,0], 'bo')#
+        ax[1].set_title(f'SVC predicted probability')
+        ax[1].set_ylabel("Risk")
+
+        ax[2].plot(X_original[:,1], probs[:,1], 'ro')        
+        ax[2].set_title(f'SVC predicted probability')
+        ax[2].set_ylabel("Risk")
+
+        
+        fig.tight_layout()
+        plt.show()
+        
+
+  
 class TrainLogisticRegression(DataTrainer):
+    def __init__(self):
+        self.name = "Logistic Regression"
     
     def train(self, X, y):
+        # logreg=LogisticRegression()
+
+        # predicted = cross_validation.cross_val_predict(logreg, X, y, cv=10)
+        # print("Logistic regression: \n", metrics.accuracy_score(y, predicted) )
+        # print("Logistic regression: \n", metrics.classification_report(y, predicted))
         logreg=LogisticRegression()
-        predicted = cross_validation.cross_val_predict(logreg, X, y, cv=10)
-        print("Logistic regression: \n", metrics.accuracy_score(y, predicted) )
-        print("Logistic regression: \n", metrics.classification_report(y, predicted))
+        self.model = logreg.fit(X, y)
+        scores = cross_val_score(self.model, X, y, cv=5)
+        print("%0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
+        # threshold = 0.5
+        # log_reg.predict_proba(X_test)
+        return self.model, scores.mean()
 
+    def plot(self, X_test, X_original, y):
+
+        # Plot the test data, the logistic regression curve and the ROC
         
-        model = LogisticRegression.fit(X, y)
-        scores = cross_val_score(model, X, y, cv=5)
-        threshold = 0.5
-        log_reg.predict_proba(X_test)
+        fig, ax = plt.subplots(nrows=len(X_test.T), ncols=2, figsize=(8, 3*len(X_test.T)))
 
-        from sklearn.model_selection import cross_val_score
-        clf = svm.SVC(kernel='linear', C=1, random_state=42)
-         = cross_val_score(clf, X, y, cv=5)
+        #        X_original = scaler.inverse_transform(X_test)
+
+        probs = self.model.predict_proba(X_test)
+        importance = self.model.coef_[0]
+
+        # # summarize feature importance
+        # for i,v in enumerate(importance):
+	#     print('Feature: %0d, Score: %.5f' % (i,v))
+        #     # plot feature importance
+        #     pyplot.bar([x for x in range(len(importance))], importance)
+        #     pyplot.show()        
+        for i, (X,pred) in enumerate(zip( X_original.T, probs.T)):
+            
+            ax[i, 0].set_title(f'X_test {i}')
+            ax[i, 0].plot(X, y, 'b+')
+            ax[i, 0].set_ylabel("Classification")
+
+            #             xlim = ax[i,0].get_xlim()
+            # ylim = ax[i,0].get_ylim()
+
+            # # create grid to evaluate model
+            # xx = np.linspace(xlim[0], xlim[1], 30)
+            # yy = np.linspace(ylim[0], ylim[1], 30)
+            # YY, XX = np.meshgrid(yy, xx)
+            # xy = np.vstack([XX.ravel(), YY.ravel()]).T
+            # Z = model.decision_function(xy).reshape(XX.shape)
 
 
-    def plot(self, data):
-        fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 3))
-        ax[0].imshow(original_image, cmap='gray')
-        ax[0].set_title('Original image')
-        ax[0].axis('off')
+            # # plot decision boundary and margins
+            # ax[i,0].contour(
+            #     XX, YY, Z, colors="k", levels=[-1, 0, 1], alpha=0.5, linestyles=["--", "-", "--"]
+            # )
 
-        ax[1].plot(self.original_data[:,0], self.original_data[:,1])
-
-        yb  = self.fit.straight_line(self.before[:,0], self.params_straight[0], self.params_straight[1])
-        yb1 = self.fit.straight_line(self.before[:,0], self.params_straight[0] + self.stdevs_straight[0], self.params_straight[1] + self.stdevs_straight[1])
-        yb2 = self.fit.straight_line(self.before[:,0], self.params_straight[0] - self.stdevs_straight[0], self.params_straight[1] - self.stdevs_straight[1])
-
-
-        ya  = np.array( [ self.fit.flat_line(val, self.params_flat[0])                       for val in self.after[:,0] ] )
-        ya1 = np.array( [ self.fit.flat_line(val, self.params_flat[0] + self.stdevs_flat[0]) for val in self.after[:,0] ] )
-        ya2 = np.array( [ self.fit.flat_line(val, self.params_flat[0] - self.stdevs_flat[0]) for val in self.after[:,0] ] )
-
-        
-        ax[1].plot(self.before[:,0], yb, 'r-')
-        ax[1].plot(self.before[:,0], yb1, 'g--')
-        ax[1].plot(self.before[:,0], yb2, 'g--')
-        ax[1].fill_between(self.before[:,0], yb1, yb2, facecolor="gray", alpha=0.15)
-
-        print("Segmented data: ",self.before.shape, self.after.shape)
-        ax[1].plot(self.after[:,0], ya, 'b-')
-        ax[1].plot(self.after[:,0], ya1, 'm--')
-        ax[1].plot(self.after[:,0], ya2, 'm--')
-        ax[1].fill_between(self.after[:,0], ya1, ya2, facecolor="gray", alpha=0.15)
-
-        
-        ax[1].set_xlabel("Surface Depth")
-        ax[1].set_ylabel("Alpha-beta fraction")        
-        ax[1].set_title('Alpha-beta volume fraction with surface depth')
+            ax[i, 1].plot(X, pred, 'ro')
+            ax[i, 1].set_title(f'{self.name} predicted probability')
+            ax[i, 1].set_ylabel("Risk")
         fig.tight_layout()
         plt.show()
         
@@ -497,8 +578,7 @@ class TrainLogisticRegression(DataTrainer):
 
     
 class ClassificationContainer:
-    def __init__(self, classification_method: Type[DataClassification], data: str, image_directory: str):
-        self.data_directory = data_directory
+    def __init__(self, classification_methods, data: str, image_directory: str):
         self.image_directory = image_directory        
         self.images = np.loadtxt(data, skiprows=1, usecols=(0,), dtype=np.str)
 
@@ -507,49 +587,28 @@ class ClassificationContainer:
         self.X = np.loadtxt(data, skiprows=1, usecols=(2,4,), dtype=np.float)
 
         # split into train test sets
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.40, random_state=1, stratify=y)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.30, random_state=1, stratify=self.y)
 
+        self.scaler = preprocessing.StandardScaler().fit(self.X_train)
+        self.X_train_transformed = self.scaler.transform(self.X_train)
+        self.X_test_transformed  = self.scaler.transform(self.X_test)
         
-        self.method = classification_method()
-        self.method_name = self.method.name
+        self.methods = classification_methods
 
         now = datetime.now()
         self.dt = now.strftime("%Y-%m-%d--%H-%M-%S")
 
-    def get_filename_from_id(self, name):
-        
-        analysis_name = os.path.splitext(name.split('_')[0])[0]
-        base_name = os.path.splitext(name.split('_')[1])[0]
-        extension = os.path.splitext(name)[1]
-        prefixed = [filename for filename in os.listdir(self.image_directory) if filename.startswith(base_name)]
 
-        # Assuming just one identifier from image name, can't deal with multiple images'
-        print("Unprocessed image: ", prefixed[0])
-        return prefixed[0]
+    def train_models(self, plot=True):
 
-    def classify_images(self, plot=True):
+        for method in self.methods:
+            trainer = method()
+            model, score = trainer.train(self.X_train_transformed, self.y_train)
+            print(trainer.name, "\n", " > Score = ", score)
 
-        for data in self.data_directory:
-            unprocessed_name = self.get_filename_from_id(image)
-            original_image =   color.rgb2gray(imageio.imread(f"{self.image_directory}/{unprocessed_name}"))
-            self.method.classify( original_image, unprocessed_image )
             if plot:
-                self.method.plot(original_image)
+                trainer.plot(self.X_test_transformed, self.X_test, self.y_test)
             
-            self.save(image, self.method.data)
-            
-
-            
-        for image in self.images:
-            original_image =   color.rgb2gray(imageio.imread(f"{self.image_directory}/{image}"))
-            unprocessed_name = self.get_filename_from_id(image)
-            unprocessed_image =   color.rgb2gray(imageio.imread(f"{self.original_image_directory}/{unprocessed_name}"))
-            self.method.analyse( original_image, unprocessed_image )
-            if plot:
-                self.method.plot(original_image)
-            
-            self.save(image, self.method.data)
-
 
     def create_output_directory(self):
         dir_name = f"{self.method_name}_{self.dt}_{self.image_directory}"
@@ -585,20 +644,30 @@ class ClassificationContainer:
 if __name__ == '__main__':
     # Test out the functionality
 
-    plot=False
+    plot=True
     image_directory = "images"
-    data = "BisectionFit_2021-11-12--11-15-11.dat"
-    print(f"Analysing images from {image_directory}, using data {data}..")    
-    # Now analyse
-    print(f"> Alpha-beta fraction")    
-    analysis = AlphaBetaFraction
-    ac = AnalysisContainer(analysis, image_directory)
-    ac.analyse_images(plot=plot)
+    data = "BisectionFit_2021-11-12--11-40-00.dat"
+    data = "MultisectionFit_2021-11-12--16-57-46.dat"
+    print(f"Analysing images from {image_directory}, using data {data}..")
 
-    print(f"> Chris Alpha-beta fraction")    
-    analysis = ChrisAlphaBetaFraction
-    ac = AnalysisContainer(analysis, image_directory)
-    ac.analyse_images(plot=plot)
+
+    trainers = [TrainLogisticRegression, TrainSVM]
+    cc = ClassificationContainer(trainers, data, image_directory )
+    cc.train_models(plot=plot)
+
+    
+    # for trainer in trainers:
+    #     cc = ClassificationContainer()
+    # # Now analyse
+    # print(f"> Alpha-beta fraction")    
+    # analysis = AlphaBetaFraction
+    # ac = AnalysisContainer(analysis, image_directory)
+    # ac.analyse_images(plot=plot)
+
+    # print(f"> Chris Alpha-beta fraction")    
+    # analysis = ChrisAlphaBetaFraction
+    # ac = AnalysisContainer(analysis, image_directory)
+    # ac.analyse_images(plot=plot)
 
     
     
