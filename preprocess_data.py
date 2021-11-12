@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from abc import ABC, abstractmethod
 import os
 from typing import Type, TypeVar
-
+from datetime import datetime
 # Make an abstract base class which supplies a processing function upon an image
 class DataAnalysis(ABC):
     
@@ -59,14 +59,14 @@ class LinearFit:
 
     def flat(self, data):
         d = { "data" : data,
-              "name" : "flat line"
+              "name" : "flat line",
               "func" : self.flat_line,
               "expected" : (0.7,)}
         return d
 
     def straight(self, data):
         d = { "data" : data,
-              "name" : "straight line"
+              "name" : "straight line",
               "func" : self.straight_line,
               "expected" : (-1/2500., 0.7)}
         return d
@@ -83,24 +83,31 @@ class LinearFit:
     
 
     
-class FitSegmentData(DataAnalysis):
-    def __init__(self, data):
+class BisectionFit(DataAnalysis):
+    def __init__(self):
         self.fit = LinearFit()
-        self.data = data
-    
+        self.name = "BisectionFit"
+        self.comment = "# Gradient_from_surface[ab_frac/pixel] mean_in_bulk[ab_frac] surface_bulk_ratio"
+
     def compare_methods(self, linear_data, flat_data):
         self.params_flat,     self.stdevs_flat     = self.fit(**self.flat(flat_data))
         self.params_straight, self.stdevs_straight = self.fit(**self.straight(linear_data))
 
         # compare the standard deviation between the points and see what fits better
+        # Extent of data before
+        mean_fit = (  self.fit.straight_line( self.before[ 0,0], self.params_straight[0], self.params_straight[1])
+                    + self.fit.straight_line( self.before[-1,0], self.params_straight[0], self.params_straight[1]) ) / 2
         f_data = self.params_flat[0], self.stdevs_flat[0]
-        s_data_g, s_data_i = (self.params_straight[0], self.stdevs_straight[0]) (self.params_straight[1], self.stdevs_straight[1])
+        s_data_g, s_data_i = (self.params_straight[0], self.stdevs_straight[0]), (self.params_straight[1], self.stdevs_straight[1])
 
-        self.output = "{self.params_straight[0]} {self.stdevs_straight[0]} {self.params_straight[1]} {self.stdevs_straight[0]} {self.params_flat[0]} {self.stdevs_flat[0]} \n"
+        # self.data = "{self.params_straight[0]} {self.stdevs_straight[0]} {self.params_straight[1]} {self.stdevs_straight[0]} {self.params_flat[0]} {self.stdevs_flat[0]} \n"
+
+        self.data = "{self.params_straight[0]} {self.params_flat[0]} {mean_fit/self.params_flat[0]}\n"
         return f_data, s_data_g, s_data_i
         
 
-    def analyse(self):
+    def analyse(self, data):
+        self.data = data
         # Here we test the hypotheses, based on the data we botain
         # Give initial line
         line = (np.max(self.data[:,0]) - np.min(self.data[:,0])) / 2.
@@ -115,8 +122,7 @@ class FitSegmentData(DataAnalysis):
 
 
     def plot(self, original_image):
-        fig, ax = plt.subplots(nrows=1, ncols=2)
-
+        fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 3))
         ax[0].imshow(original_image, cmap='gray')
         ax[0].set_title('Original image')
         ax[0].axis('off')
@@ -159,7 +165,7 @@ class FitSegmentData(DataAnalysis):
 class PreprocessContainer:
     def __init__(self, analysis_method: Type[DataAnalysis], image_directory: str, data_directory: str, denudation_data:str):
 
-        self.denudation_images  = np.loadtxt(denudation_data, usecols=(0,), skiprows=1)
+        self.denudation_images  = np.loadtxt(denudation_data, usecols=(0,), skiprows=1, dtype=np.str)
 
         self.image_directory = image_directory
         self.images = self.sort_files_by_data(os.listdir(self.image_directory), self.denudation_images)
@@ -173,37 +179,10 @@ class PreprocessContainer:
         now = datetime.now()
         self.dt = now.strftime("%Y-%m-%d--%H-%M-%S")
 
-    def sort_files_by_data(self, files, ordered_list, condition_func=None):
-        names = []
-        for o in ordered_list:
-            for f in files:
-                if f.startswith(o):
-                    names.append(f)
-        print(len(names), len(ordered_list), len(files))
-        return names
-
-    def sort_analysis_files_by_data(self, files, ordered_list, condition_func=None):
-        names = []
-        for o in ordered_list:
-            for f in files:
-                base_name = os.path.splitext(f.split('_')[1])[0]
-                if base_name == o:
-                    names.append(f)
-        print(len(names), len(ordered_list), len(files))
-        return names
-
-
-    def get_filename_from_id(self, name):
-        analysis_name = os.path.splitext(name.split('_')[0])[0]
-        base_name = os.path.splitext(name.split('_')[1])[0]
-        extension = os.path.splitext(name)[1]
-        prefixed = [filename for filename in os.listdir(self.image_directory) if filename.startswith(base_name)]
-        
-        print("Unprocessed image: ", prefixed[0])
-        return prefixed[0]
-
     def analyse_images(self, plot=True):
-        for data_file in self.data_files:
+        mode = 'w'
+
+        for data_file, image in zip(self.data_files, self.images):
             unprocessed_name = self.get_filename_from_id(image)
             unprocessed_image =   color.rgb2gray(imageio.imread(f"{self.original_image_directory}/{unprocessed_name}"))
 
@@ -214,8 +193,8 @@ class PreprocessContainer:
             if plot:
                 self.method.plot(original_image)
             
-            self.save(image, self.method.data)
-
+            self.save(image, self.method.data, mode)
+            mode='a'
 
     def create_output_directory(self):
         dir_name = f"{self.method_name}_{self.dt}_{self.image_directory}"
@@ -225,9 +204,9 @@ class PreprocessContainer:
     
 
     def save(self, image_name, data, mode='w'):
-        self.dir_name = self.create_output_directory()
+        # self.dir_name = self.create_output_directory()
         name = os.path.splitext(image_name)[0]
-        path = os.path.join(self.dir_name, f"{self.method_name}_{name}.dat")
+        path = os.path.join(self.dir_name, f"{self.method_name}_{name}_{self.dt}.dat")
         
         
         print(f"> Saving data to {path}")
@@ -241,6 +220,53 @@ class PreprocessContainer:
                     data_line = (' '.join(["{: 12.6f}" * len(row)])).format( *tuple(row) ) + "\n"
                     f.write(data_line)
             elif isinstance(self.method.data, str):
+                if mode == 'w':
+                    f.write(self.method.comment + "\n")
                 f.write(self.method.data)
-        
-    
+
+    def sort_files_by_data(self, files, ordered_list, condition_func=None):
+        names = []
+        for o in ordered_list:
+            for f in files:
+                if o in f:
+                    names.append(f)
+        print("sort files by data: ", len(names), len(ordered_list), len(files))
+        return names
+
+    def sort_analysis_files_by_data(self, files, ordered_list, condition_func=None):
+        names = []
+        for o in ordered_list:
+            for f in files:
+                base_name = os.path.splitext(f.split('_')[1])[0]
+                if base_name == o:
+                    names.append(f)
+        print("sort analysis files", len(names), len(ordered_list), len(files))
+        return names
+
+
+    def get_filename_from_id(self, name):
+        analysis_name = os.path.splitext(name.split('_')[0])[0]
+        base_name = os.path.splitext(name.split('_')[1])[0]
+        extension = os.path.splitext(name)[1]
+        prefixed = [filename for filename in os.listdir(self.image_directory) if filename.startswith(base_name)]
+
+        print("Unprocessed image: ", prefixed[0])
+        return prefixed[0]
+
+if __name__ == "__main__":
+
+    plot=True
+    image_directory =  "images" #"images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
+    data_directory = "AlphaBetaFraction_2021-11-04--09-37-03_images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
+    denudation_data = "denudation_data.dat"
+    print(f"Preprocessing data from {data_directory}, with images from {image_directory}..")
+    # Now analyse
+    print(f"> Gradient data from alpha-beta fraction")
+    analysis = BisectionFit
+    ac = PreprocessContainer(analysis, image_directory, data_directory, denudation_data)
+    ac.analyse_images(plot=plot)
+
+    # print(f"> Chris Alpha-beta fraction")
+    # analysis = ChrisAlphaBetaFraction
+    # ac = AnalysisContainer(analysis, image_directory)
+    # ac.analyse_images(plot=plot)
