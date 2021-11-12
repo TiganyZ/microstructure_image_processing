@@ -332,11 +332,24 @@ from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_curve, f1_score
+from sklearn import svm,  cross_validation
 from matplotlib import pyplot
 from sklearn import preprocessing
 from sklearn.model_selection import StratifiedKFold, KFold
 
 # Make an abstract base class which supplies a processing function upon an image
+class DataTrainer(ABC):
+    
+    @abstractmethod
+    def train(self, data):
+        pass
+            
+    @abstractmethod
+    def plot(self, data):
+        pass
+
+ 
+
 class DataClassification(ABC):
     
     @abstractmethod
@@ -423,54 +436,80 @@ class BayesianLogisticHypothesis(DataClassification):
         return likelihood * prior / evidence
     
 
-class Container:
-    def __init__(self, classified_image_data : str, volume_fraction_data_directory : str, image_directory : str):
-        # Defining the classes which will help with the logistic regression:
-        # 1. The ROC optimisation for the logistic regression to find the best threshold.
 
-        self.image_directory = image_directory
-        self.volume_fraction_data_directory = volume_fraction_data_directory
-        
-        self.images_classified = np.loadtxt(classified_image_data, usecols=[0], dtype=np.str)
-        self.denudation_classification = np.loadtxt(classified_image_data, usecols=[1], dtype=np.int)
-
-        # Preprocess the data to provide a simple linear fit to the
-        # pixel depth. Maybe split the data into two halves and then
-        # take the gradient / the ratio between them too, we can see
-        # how they vary as predictors
-
-        
-        cv = ShuffleSplit(n_splits=5, test_size=0.3, random_state=0)
-        scaler = preprocessing.StandardScaler().fit(X_train)
-        X_train_transformed = scaler.transform(X_train)
-        clf = svm.SVC(C=1).fit(X_train_transformed, y_train)
-        X_test_transformed = scaler.transform(X_test)
-        clf.score(X_test_transformed, y_test)
-        
-        
-        self.roc = ROCThresholdDetermination()
+class TrainLogisticRegression(DataTrainer):
     
-    def get_features(self, data_file, mode='a'):
-        feature_extraction = FitSegmentData(data)
+    def train(self, X, y):
+        logreg=LogisticRegression()
+        predicted = cross_validation.cross_val_predict(logreg, X, y, cv=10)
+        print("Logistic regression: \n", metrics.accuracy_score(y, predicted) )
+        print("Logistic regression: \n", metrics.classification_report(y, predicted))
 
         
-   def get_filename_from_id(self, name):
-        
-        analysis_name = os.path.splitext(name.split('_')[0])[0]
-        base_name = os.path.splitext(name.split('_')[1])[0]
-        extension = os.path.splitext(name)[1]
-        prefixed = [filename for filename in os.listdir(self.image_directory) if filename.startswith(base_name)]
+        model = LogisticRegression.fit(X, y)
+        scores = cross_val_score(model, X, y, cv=5)
+        threshold = 0.5
+        log_reg.predict_proba(X_test)
 
-        # Assuming just one identifier from image name, can't deal with multiple images'
-        print("Unprocessed image: ", prefixed[0])
-        return prefixed[0]
+        from sklearn.model_selection import cross_val_score
+        clf = svm.SVC(kernel='linear', C=1, random_state=42)
+         = cross_val_score(clf, X, y, cv=5)
+
+
+    def plot(self, data):
+        fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 3))
+        ax[0].imshow(original_image, cmap='gray')
+        ax[0].set_title('Original image')
+        ax[0].axis('off')
+
+        ax[1].plot(self.original_data[:,0], self.original_data[:,1])
+
+        yb  = self.fit.straight_line(self.before[:,0], self.params_straight[0], self.params_straight[1])
+        yb1 = self.fit.straight_line(self.before[:,0], self.params_straight[0] + self.stdevs_straight[0], self.params_straight[1] + self.stdevs_straight[1])
+        yb2 = self.fit.straight_line(self.before[:,0], self.params_straight[0] - self.stdevs_straight[0], self.params_straight[1] - self.stdevs_straight[1])
+
+
+        ya  = np.array( [ self.fit.flat_line(val, self.params_flat[0])                       for val in self.after[:,0] ] )
+        ya1 = np.array( [ self.fit.flat_line(val, self.params_flat[0] + self.stdevs_flat[0]) for val in self.after[:,0] ] )
+        ya2 = np.array( [ self.fit.flat_line(val, self.params_flat[0] - self.stdevs_flat[0]) for val in self.after[:,0] ] )
+
+        
+        ax[1].plot(self.before[:,0], yb, 'r-')
+        ax[1].plot(self.before[:,0], yb1, 'g--')
+        ax[1].plot(self.before[:,0], yb2, 'g--')
+        ax[1].fill_between(self.before[:,0], yb1, yb2, facecolor="gray", alpha=0.15)
+
+        print("Segmented data: ",self.before.shape, self.after.shape)
+        ax[1].plot(self.after[:,0], ya, 'b-')
+        ax[1].plot(self.after[:,0], ya1, 'm--')
+        ax[1].plot(self.after[:,0], ya2, 'm--')
+        ax[1].fill_between(self.after[:,0], ya1, ya2, facecolor="gray", alpha=0.15)
+
+        
+        ax[1].set_xlabel("Surface Depth")
+        ax[1].set_ylabel("Alpha-beta fraction")        
+        ax[1].set_title('Alpha-beta volume fraction with surface depth')
+        fig.tight_layout()
+        plt.show()
+        
+
+    
+
     
 class ClassificationContainer:
-    def __init__(self, classification_method: Type[DataClassification], data_directory: str, image_directory: str):
+    def __init__(self, classification_method: Type[DataClassification], data: str, image_directory: str):
         self.data_directory = data_directory
         self.image_directory = image_directory        
-        self.data = os.listdir(self.data_directory)
+        self.images = np.loadtxt(data, skiprows=1, usecols=(0,), dtype=np.str)
 
+        self.y = np.loadtxt(data, skiprows=1, usecols=(1,), dtype=np.int)
+        # using gradient and ratio for the data
+        self.X = np.loadtxt(data, skiprows=1, usecols=(2,4,), dtype=np.float)
+
+        # split into train test sets
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(X, y, test_size=0.40, random_state=1, stratify=y)
+
+        
         self.method = classification_method()
         self.method_name = self.method.name
 
@@ -547,9 +586,9 @@ if __name__ == '__main__':
     # Test out the functionality
 
     plot=False
-    image_directory = "images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
-    
-    print(f"Analysing images from {image_directory}..")    
+    image_directory = "images"
+    data = "BisectionFit_2021-11-12--11-15-11.dat"
+    print(f"Analysing images from {image_directory}, using data {data}..")    
     # Now analyse
     print(f"> Alpha-beta fraction")    
     analysis = AlphaBetaFraction

@@ -61,7 +61,6 @@ class LinearFit:
         x, y = data[:,0], data[:,1]
         params,cov=curve_fit(func, x, y, expected)
         stdevs = np.sqrt(np.diag(cov))
-        print(params)
         return params, stdevs        
 
     def flat(self, data):
@@ -86,7 +85,6 @@ class LinearFit:
             print(f"{name} fit: WARNING: Cannot fit to {name}, will give flat dependence for line")
             params = expected
             stdevs = np.array([1 for i in params])
-        print(name, params, stdevs)
         return params, stdevs
     
 
@@ -174,6 +172,7 @@ class PreprocessContainer:
     def __init__(self, analysis_method: Type[DataAnalysis], image_directory: str, data_directory: str, denudation_data:str):
 
         self.denudation_images  = np.loadtxt(denudation_data, usecols=(0,), skiprows=1, dtype=np.str)
+        self.denudation_classification  = np.loadtxt(denudation_data, usecols=(1,), skiprows=1, dtype=np.int)        
 
         self.image_directory = image_directory
         self.images = self.sort_files_by_data(os.listdir(self.image_directory), self.denudation_images)
@@ -190,7 +189,7 @@ class PreprocessContainer:
     def analyse_images(self, plot=True):
         mode = 'w'
 
-        for data_file, image in zip(self.data_files, self.images):
+        for data_file, image, classification in zip(self.data_files, self.images, self.denudation_classification):
             unprocessed_name = image #self.get_filename_from_id(image)
             print(f"\ndata_file = {data_file}\nimage = {self.image_directory}/{unprocessed_name} \n ")
             unprocessed_image =   color.rgb2gray(imageio.imread(f"{self.image_directory}/{unprocessed_name}"))
@@ -201,8 +200,9 @@ class PreprocessContainer:
             self.method.analyse( data )
             if plot:
                 self.method.plot(unprocessed_image)
-            
-            self.save(image, self.method.data, mode)
+
+            self.method.comment.replace("#", "# Classification ")
+            self.save(image, f"{image} {classification:1d} " + self.method.data, mode)
             mode='a'
 
     def create_output_directory(self):
@@ -232,7 +232,7 @@ class PreprocessContainer:
             elif isinstance(self.method.data, str):
                 if mode == 'w':
                     f.write(self.method.comment + "\n")
-                f.write(self.method.data)
+                f.write(data)
 
     def sort_files_by_data(self, files, ordered_list, condition_func=None):
         names = []
@@ -265,7 +265,7 @@ class PreprocessContainer:
 
 if __name__ == "__main__":
 
-    plot=True
+    plot=False #True
     image_directory =  "images" #"images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
     data_directory = "AlphaBetaFraction_2021-11-04--09-37-03_images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
     denudation_data = "denudation_data.dat"
