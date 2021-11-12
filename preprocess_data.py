@@ -106,12 +106,12 @@ class FitSegmentData(DataAnalysis):
         line = (np.max(self.data[:,0]) - np.min(self.data[:,0])) / 2.
         
         segment = SegmentData(self.data, line)
-        before, after = segment.segment_data()
+        self.before, self.after = segment.segment_data()
 
         # On the segmented data I could do cross validation to find
         # the best model and error. This can determine the threshold.
 
-        return compare_methods(before, after)
+        return compare_methods(self.before, self.after)
 
 
     def plot(self, original_image):
@@ -123,19 +123,26 @@ class FitSegmentData(DataAnalysis):
 
         ax[1].plot(self.data[:,0], self.data[:,1])
 
-        ya  = self.fit.flat_line(xfine, popt[0]  , popt[1])
-        ya1 = self.fit.flat_line(xfine, popt[0] + pcov[0,0]**0.5, popt[1] - pcov[1,1]**0.5)
-        ya2 = self.fit.flat_line(xfine, popt[0] - pcov[0,0]**0.5, popt[1] + pcov[1,1]**0.5)
 
-        yb  = self.fit.straight_line(xfine, popt[0], popt[1])
-        yb1 = self.fit.straight_line(xfine, popt[0] + pcov[0,0]**0.5, popt[1] - pcov[1,1]**0.5)
-        yb2 = self.fit.straight_line(xfine, popt[0] - pcov[0,0]**0.5, popt[1] + pcov[1,1]**0.5)
+        yb  = self.fit.straight_line(self.before[:,0], self.params_straight[0], self.params_straight[1])
+        yb1 = self.fit.straight_line(self.before[:,0], self.params_straight[0] + self.stdevs_straight[0], self.params_straight[1] - self.stdevs_straight[1])
+        yb2 = self.fit.straight_line(self.before[:,0], self.params_straight[0] - self.stdevs_straight[0], self.params_straight[1] + self.stdevs_straight[1])
+
+
+        ya  = self.fit.flat_line(self.after[:,0], self.params_flat[0], self.params_flat[1])
+        ya1 = self.fit.flat_line(self.after[:,0], self.params_flat[0] + self.stdevs_flat[0], self.params_flat[1] - self.stdevs_flat[1])
+        ya2 = self.fit.flat_line(self.after[:,0], self.params_flat[0] - self.stdevs_flat[0], self.params_flat[1] + self.stdevs_flat[1])
 
         
-        plt.plot(xfine, y, 'r-')
-        plt.plot(xfine, y1, 'g--')
-        plt.plot(xfine, y2, 'g--')
-        plt.fill_between(xfine, y1, y2, facecolor="gray", alpha=0.15)
+        ax[1].plot(self.before[:,0], yb, 'r-')
+        ax[1].plot(self.before[:,0], yb1, 'g--')
+        ax[1].plot(self.before[:,0], yb2, 'g--')
+        ax[1].fill_between(self.before[:,0], yb1, yb2, facecolor="gray", alpha=0.15)
+
+        ax[1].plot(self.after[:,0], ya, 'b-')
+        ax[1].plot(self.after[:,0], ya1, 'm--')
+        ax[1].plot(self.after[:,0], ya2, 'm--')
+        ax[1].fill_between(self.after[:,0], ya1, ya2, facecolor="gray", alpha=0.15)
 
         
         ax[1].set_xlabel("Surface Depth")
@@ -150,18 +157,41 @@ class FitSegmentData(DataAnalysis):
     
     
 class PreprocessContainer:
-    def __init__(self, analysis_method: Type[DataAnalysis], image_directory: str, data_directory: str):
+    def __init__(self, analysis_method: Type[DataAnalysis], image_directory: str, data_directory: str, denudation_data:str):
+
+        self.denudation_images  = np.loadtxt(denudation_data, usecols=(0,), skiprows=1)
+
         self.image_directory = image_directory
-        self.images = os.listdir(self.image_directory)
+        self.images = self.sort_files_by_data(os.listdir(self.image_directory), self.denudation_images)
 
         self.data_directory = data_directory
-        self.data_files = os.listdir(self.data_files)
+        self.data_files = self.sort_analysis_files_by_data(os.listdir(self.data_directory), self.denudation_images)
         
         self.method = analysis_method()
         self.method_name = self.method.name
 
         now = datetime.now()
         self.dt = now.strftime("%Y-%m-%d--%H-%M-%S")
+
+    def sort_files_by_data(self, files, ordered_list, condition_func=None):
+        names = []
+        for o in ordered_list:
+            for f in files:
+                if f.startswith(o):
+                    names.append(f)
+        print(len(names), len(ordered_list), len(files))
+        return names
+
+    def sort_analysis_files_by_data(self, files, ordered_list, condition_func=None):
+        names = []
+        for o in ordered_list:
+            for f in files:
+                base_name = os.path.splitext(f.split('_')[1])[0]
+                if base_name == o:
+                    names.append(f)
+        print(len(names), len(ordered_list), len(files))
+        return names
+
 
     def get_filename_from_id(self, name):
         analysis_name = os.path.splitext(name.split('_')[0])[0]
@@ -177,8 +207,9 @@ class PreprocessContainer:
             unprocessed_name = self.get_filename_from_id(image)
             unprocessed_image =   color.rgb2gray(imageio.imread(f"{self.original_image_directory}/{unprocessed_name}"))
 
-            data = np.loadtxt(data_file, usecols[0,1], skiprows=1)
             # This gives the pixel depth, alpha beta volume fraction data
+            data = np.loadtxt(f"{self.data_directory}/{data_file}", usecols=(0,1), skiprows=1)
+
             self.method.analyse( data )
             if plot:
                 self.method.plot(original_image)
