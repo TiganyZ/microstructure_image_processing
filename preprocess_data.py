@@ -4,6 +4,10 @@ from abc import ABC, abstractmethod
 import os
 from typing import Type, TypeVar
 from datetime import datetime
+from skimage import color, exposure, img_as_float, img_as_uint, img_as_ubyte, util, measure
+import imageio
+from scipy.optimize import curve_fit, minimize
+
 # Make an abstract base class which supplies a processing function upon an image
 class DataAnalysis(ABC):
     
@@ -24,9 +28,9 @@ class SegmentData:
     def segment_from_condition(self, cond):
         i = np.arange(len(cond))[cond]
 
-        cond_data = np.zeros((len(cond), self.data.shape[1]))
-        cond_data[:,0] =  (self.data[:,0])[cond]
-        cond_data[:,1] =  (self.data[:,1])[cond]
+        cond_data = np.zeros((len(i), self.data.shape[1]))
+        cond_data[:,0] =  (self.data[:,0])[i]
+        cond_data[:,1] =  (self.data[:,1])[i]
 
         return cond_data
 
@@ -34,11 +38,14 @@ class SegmentData:
         # Segment data naively, to classify the data into two sets,
         # such that one can compare both.
 
-        before = self.data[:,1] <  self.line
-        after  = self.data[:,1] >= self.line
+        before = self.data[:,0] <  self.line
+        after  = self.data[:,0] >= self.line
 
-        before_data = self.segment_from_condition(self.data, before)
-        after_data  = self.segment_from_condition(self.data, after )        
+        before_data = self.segment_from_condition( before)
+        after_data  = self.segment_from_condition( after )
+
+        # print("before data = ", before_data)
+        # print("after data = ", after_data)        
 
         return before_data, after_data
 
@@ -79,6 +86,7 @@ class LinearFit:
             print(f"{name} fit: WARNING: Cannot fit to {name}, will give flat dependence for line")
             params = expected
             stdevs = np.array([1 for i in params])
+        print(name, params, stdevs)
         return params, stdevs
     
 
@@ -90,8 +98,8 @@ class BisectionFit(DataAnalysis):
         self.comment = "# Gradient_from_surface[ab_frac/pixel] mean_in_bulk[ab_frac] surface_bulk_ratio"
 
     def compare_methods(self, linear_data, flat_data):
-        self.params_flat,     self.stdevs_flat     = self.fit(**self.flat(flat_data))
-        self.params_straight, self.stdevs_straight = self.fit(**self.straight(linear_data))
+        self.params_flat,     self.stdevs_flat     = self.fit.fit(**self.fit.flat(flat_data))
+        self.params_straight, self.stdevs_straight = self.fit.fit(**self.fit.straight(linear_data))
 
         # compare the standard deviation between the points and see what fits better
         # Extent of data before
@@ -102,23 +110,23 @@ class BisectionFit(DataAnalysis):
 
         # self.data = "{self.params_straight[0]} {self.stdevs_straight[0]} {self.params_straight[1]} {self.stdevs_straight[0]} {self.params_flat[0]} {self.stdevs_flat[0]} \n"
 
-        self.data = "{self.params_straight[0]} {self.params_flat[0]} {mean_fit/self.params_flat[0]}\n"
+        self.data = f"{self.params_straight[0]} {self.params_flat[0]} {mean_fit/self.params_flat[0]}\n"
         return f_data, s_data_g, s_data_i
         
 
     def analyse(self, data):
-        self.data = data
+        self.original_data = data
         # Here we test the hypotheses, based on the data we botain
         # Give initial line
-        line = (np.max(self.data[:,0]) - np.min(self.data[:,0])) / 2.
+        line = (np.max(self.original_data[:,0]) - np.min(self.original_data[:,0])) / 2.
         
-        segment = SegmentData(self.data, line)
+        segment = SegmentData(self.original_data, line)
         self.before, self.after = segment.segment_data()
 
         # On the segmented data I could do cross validation to find
         # the best model and error. This can determine the threshold.
 
-        return compare_methods(self.before, self.after)
+        return self.compare_methods(self.before, self.after)
 
 
     def plot(self, original_image):
@@ -127,17 +135,16 @@ class BisectionFit(DataAnalysis):
         ax[0].set_title('Original image')
         ax[0].axis('off')
 
-        ax[1].plot(self.data[:,0], self.data[:,1])
-
+        ax[1].plot(self.original_data[:,0], self.original_data[:,1])
 
         yb  = self.fit.straight_line(self.before[:,0], self.params_straight[0], self.params_straight[1])
-        yb1 = self.fit.straight_line(self.before[:,0], self.params_straight[0] + self.stdevs_straight[0], self.params_straight[1] - self.stdevs_straight[1])
-        yb2 = self.fit.straight_line(self.before[:,0], self.params_straight[0] - self.stdevs_straight[0], self.params_straight[1] + self.stdevs_straight[1])
+        yb1 = self.fit.straight_line(self.before[:,0], self.params_straight[0] + self.stdevs_straight[0], self.params_straight[1] + self.stdevs_straight[1])
+        yb2 = self.fit.straight_line(self.before[:,0], self.params_straight[0] - self.stdevs_straight[0], self.params_straight[1] - self.stdevs_straight[1])
 
 
-        ya  = self.fit.flat_line(self.after[:,0], self.params_flat[0], self.params_flat[1])
-        ya1 = self.fit.flat_line(self.after[:,0], self.params_flat[0] + self.stdevs_flat[0], self.params_flat[1] - self.stdevs_flat[1])
-        ya2 = self.fit.flat_line(self.after[:,0], self.params_flat[0] - self.stdevs_flat[0], self.params_flat[1] + self.stdevs_flat[1])
+        ya  = np.array( [ self.fit.flat_line(val, self.params_flat[0])                       for val in self.after[:,0] ] )
+        ya1 = np.array( [ self.fit.flat_line(val, self.params_flat[0] + self.stdevs_flat[0]) for val in self.after[:,0] ] )
+        ya2 = np.array( [ self.fit.flat_line(val, self.params_flat[0] - self.stdevs_flat[0]) for val in self.after[:,0] ] )
 
         
         ax[1].plot(self.before[:,0], yb, 'r-')
@@ -145,6 +152,7 @@ class BisectionFit(DataAnalysis):
         ax[1].plot(self.before[:,0], yb2, 'g--')
         ax[1].fill_between(self.before[:,0], yb1, yb2, facecolor="gray", alpha=0.15)
 
+        print("Segmented data: ",self.before.shape, self.after.shape)
         ax[1].plot(self.after[:,0], ya, 'b-')
         ax[1].plot(self.after[:,0], ya1, 'm--')
         ax[1].plot(self.after[:,0], ya2, 'm--')
@@ -183,15 +191,16 @@ class PreprocessContainer:
         mode = 'w'
 
         for data_file, image in zip(self.data_files, self.images):
-            unprocessed_name = self.get_filename_from_id(image)
-            unprocessed_image =   color.rgb2gray(imageio.imread(f"{self.original_image_directory}/{unprocessed_name}"))
+            unprocessed_name = image #self.get_filename_from_id(image)
+            print(f"\ndata_file = {data_file}\nimage = {self.image_directory}/{unprocessed_name} \n ")
+            unprocessed_image =   color.rgb2gray(imageio.imread(f"{self.image_directory}/{unprocessed_name}"))
 
             # This gives the pixel depth, alpha beta volume fraction data
             data = np.loadtxt(f"{self.data_directory}/{data_file}", usecols=(0,1), skiprows=1)
 
             self.method.analyse( data )
             if plot:
-                self.method.plot(original_image)
+                self.method.plot(unprocessed_image)
             
             self.save(image, self.method.data, mode)
             mode='a'
@@ -205,8 +214,9 @@ class PreprocessContainer:
 
     def save(self, image_name, data, mode='w'):
         # self.dir_name = self.create_output_directory()
+        self.dir_name = ''
         name = os.path.splitext(image_name)[0]
-        path = os.path.join(self.dir_name, f"{self.method_name}_{name}_{self.dt}.dat")
+        path = os.path.join(self.dir_name, f"{self.method_name}_{self.dt}.dat")
         
         
         print(f"> Saving data to {path}")
