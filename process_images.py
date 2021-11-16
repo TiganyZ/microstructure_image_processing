@@ -25,8 +25,9 @@ import numpy as np
 from copy import copy, deepcopy
 from skimage import  feature, color, data, restoration, exposure, img_as_float, img_as_uint, img_as_ubyte, util
 from skimage.filters import threshold_otsu, threshold_sauvola, threshold_niblack, difference_of_gaussians, window, scharr, sobel, roberts
-from skimage.segmentation import random_walker
-from skimage.morphology import reconstruction
+from skimage.segmentation import random_walker, felzenszwalb, slic, quickshift, watershed
+from skimage.segmentation import mark_boundaries
+from skimage.morphology import reconstruction, disk
 
 from scipy.fftpack import fftn, fftshift, fft2, ifft2
 
@@ -44,6 +45,10 @@ import argparse
 import os
 from typing import Type, TypeVar
 
+from scipy import ndimage as ndi
+
+from skimage.filters import rank
+from skimage.util import img_as_ubyte
 
         
 
@@ -900,6 +905,73 @@ class SobelEdges(ProcessImage):
 
     def plot(self, original_image):
         # display results
+
+        
+        # denoise image
+        #denoised = rank.median(self.output, disk(2))
+
+        # find continuous region (low gradient -
+        # where less than 10 for this image) --> markers
+        # disk(5) is used here to get a more smooth image
+        #        fill_image = ndi.binary_fill_holes(self.output)
+
+        fig, axes = plt.subplots(ncols=3, figsize=(8, 2.5))
+        ax = axes.ravel()
+        ax[0] = plt.subplot(1, 3, 1)
+        ax[1] = plt.subplot(1, 3, 2)
+        ax[2] = plt.subplot(1, 3, 3)
+
+        ax[0].imshow(original_image, cmap=plt.cm.gray)
+        ax[0].set_title('Original')
+        ax[0].axis('off')
+
+        ax[1].hist(original_image.ravel(), bins=256)
+        ax[1].set_title('Histogram')
+
+
+        #        p2, p98 = np.percentile(self.output, (2, 98))
+        self.output = exposure.equalize_adapthist(self.output, clip_limit=0.03) #exposure.rescale_intensity(self.output, in_range=(p2, p98))
+        ax[2].hist(self.output.ravel(), bins=256)
+        ax[2].set_title('Sobel Histogram')
+        
+        ax[2].axis('off')
+
+        plt.show()
+
+        
+        markers = self.output <  (np.max(self.output)-np.min(self.output))/2.  # 10 #rank.gradient(self.output, disk(3)) < 10
+        markers = ndi.label(markers)[0]
+
+        # # local gradient (disk(2) is used to keep edges thin)
+        gradient = self.output #rank.gradient(self.output, disk(2))
+
+        # # process the watershed
+        segments_watershed = watershed(gradient, markers)
+        # display results
+        fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(8, 8),
+                         sharex=True, sharey=True)
+        ax = axes.ravel()
+
+        ax[0].imshow(self.output, cmap=plt.cm.gray)
+        ax[0].set_title("Original")
+
+        ax[1].imshow(gradient, cmap=plt.cm.nipy_spectral)
+        ax[1].set_title(" Local Gradient")
+
+        ax[2].imshow(markers, cmap=plt.cm.nipy_spectral)
+        ax[2].set_title("Markers")
+
+        ax[3].imshow(self.output, cmap=plt.cm.gray)
+        ax[3].imshow(segments_watershed, cmap=plt.cm.nipy_spectral, alpha=.5)
+        ax[3].set_title("Segmented")
+
+        for a in ax:
+            a.axis('off')
+
+        fig.tight_layout()
+        plt.show()
+
+
         fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(8, 3))
 
         ax[0].imshow(original_image, cmap='gray')
@@ -908,6 +980,13 @@ class SobelEdges(ProcessImage):
         ax[1].imshow(self.output, cmap='gray')
         ax[1].set_title(r'Sobel filter', fontsize=20)
 
+
+        # segments_watershed = watershed(self.output, markers=250)
+        
+        # segments_fz = felzenszwalb(self.output, scale=100, sigma=0.5, min_size=50)
+        # ax[2].imshow(mark_boundaries(self.output, segments_watershed), cmap='gray')
+        # ax[2].set_title(r'Watershed', fontsize=20)
+        
         for a in ax:
             a.axis('off')
 
@@ -1036,14 +1115,16 @@ class ProcessContainer:
         self.method_name = self.method.name
 
 
-    def process_images(self, plot=True):
+    def process_images(self, plot=True, save=False):
         for image in self.images:
             print(f" > processing {image}")
             original_image =  color.rgb2gray(imageio.imread(f"{self.image_directory}/{image}"))
             self.method.process( original_image )
             if plot:
                 self.method.plot(original_image)
-            self.save(image, self.method.output)
+
+            if save:
+                self.save(image, self.method.output)
 
             # original_image =  imageio.imread(f"{self.image_directory}/{image}", as_gray=True)
             # if np.max(original_image) > 1.0:
@@ -1098,6 +1179,8 @@ if __name__ == '__main__':
 
     #    processes = [ ErosionSegmentation ]
 
+    processes = [SobelEdges]
+    
     arguments = [{} for process in processes ] 
     
     for process, args in zip(processes, arguments):

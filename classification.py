@@ -337,13 +337,13 @@ from datetime import datetime
 
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, KFold, GridSearchCV, cross_val_score, train_test_split
 from sklearn.metrics import roc_curve, f1_score
-from sklearn.model_selection import cross_val_score
+from sklearn.metrics import accuracy_score
 from sklearn import svm
 import matplotlib.pyplot as plt
 from sklearn import preprocessing
-from sklearn.model_selection import StratifiedKFold, KFold
+
 
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -446,13 +446,30 @@ class BayesianLogisticHypothesis(DataClassification):
     
 class TrainSVM(DataTrainer):
     def __init__(self):
-        self.name = "Logistic Regression"
+        self.name = "Support Vector Classifier"
 
     def train(self, X, y):
-        self.model = svm.SVC(kernel='linear', C=1, random_state=42,probability=True ).fit(X,y)
-        scores = cross_val_score(self.model, X, y, cv=5)
-        print("%0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
-        return self.model, scores.mean()
+
+        cv_inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
+        # define the model
+        model = svm.SVC(kernel='linear', random_state=42,probability=True )
+        # define search space
+        space = dict()
+        space['C'] = [0.1, 1, 10, 1000]
+        # define search
+        search = GridSearchCV(model, space, scoring='accuracy', cv=cv_inner, refit=True)
+        # execute search
+        result = search.fit(X, y)
+        # get the best performing model fit on the whole training set
+        self.model = result.best_estimator_
+        
+        # skf = StratifiedKFold(n_splits=3)
+        # for train, test in skf.split(X, y):
+        
+        # self.model = svm.SVC(kernel='linear', C=1, random_state=42,probability=True ).fit(X,y)
+        # scores = cross_val_score(self.model, X, y, cv=5)
+        # print("%0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
+        return self.model#, scores.mean()
     
     def plot(self, X_test, X_original, y):
 
@@ -520,13 +537,37 @@ class TrainLogisticRegression(DataTrainer):
         # predicted = cross_validation.cross_val_predict(logreg, X, y, cv=10)
         # print("Logistic regression: \n", metrics.accuracy_score(y, predicted) )
         # print("Logistic regression: \n", metrics.classification_report(y, predicted))
-        logreg=LogisticRegression()
-        self.model = logreg.fit(X, y)
-        scores = cross_val_score(self.model, X, y, cv=5)
-        print("%0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
+
+        cv_inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
+        # define the model
+        model = LogisticRegression() #(class_weight = 'balanced') #svm.SVC(kernel='linear', random_state=42,probability=True )
+        # define search space
+        space = dict()
+        space['C'] = [0.1, 1, 10, 1000]
+        # define search
+        search = GridSearchCV(model, space, scoring='accuracy', cv=cv_inner, refit=True)
+        # execute search
+        result = search.fit(X, y)
+        # get the best performing model fit on the whole training set
+        self.model = result.best_estimator_
+
+
+
+        # # calculate roc curves
+        # fpr, tpr, thresholds = roc_curve(testy, yhat)
+        # # get the best threshold
+        # J = tpr - fpr
+        # ix = argmax(J)
+        # best_thresh = thresholds[ix]
+        # print('Best Threshold=%f' % (best_thresh))
+        
+        # logreg=LogisticRegression()
+        # self.model = logreg.fit(X, y)
+        # scores = cross_val_score(self.model, X, y, cv=5)
+        # print("%0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
         # threshold = 0.5
         # log_reg.predict_proba(X_test)
-        return self.model, scores.mean()
+        return self.model#, scores.mean()
 
     def plot(self, X_test, X_original, y):
 
@@ -578,7 +619,7 @@ class TrainLogisticRegression(DataTrainer):
 
     
 class ClassificationContainer:
-    def __init__(self, classification_methods, data: str, image_directory: str):
+    def __init__(self, classification_methods, data: str, image_directory: str, excel_data: str, use_excel=True):
         self.image_directory = image_directory        
         self.images = np.loadtxt(data, skiprows=1, usecols=(0,), dtype=np.str)
 
@@ -586,6 +627,22 @@ class ClassificationContainer:
         # using gradient and ratio for the data
         self.X = np.loadtxt(data, skiprows=1, usecols=(2,4,), dtype=np.float)
 
+        if use_excel:
+            excel_images = np.loadtxt(excel_data, skiprows=1, usecols=(0,), dtype=np.str)
+            excel_ratios = np.loadtxt(excel_data, skiprows=1, usecols=(1,), dtype=np.float)
+
+            ratios = np.zeros((self.X.shape[0]))
+            for i_ind, ii in enumerate(self.images):
+                for ind, (ei, er) in enumerate(zip(excel_images, excel_ratios)):
+                    if ii.startswith(ei):
+                        ratios[i_ind] = er
+
+            ratios[ratios < 0] = 0 
+            self.X[:,1] = ratios
+
+        # self.X[:,1] = 0.
+        
+        #        print(self.X)
         # split into train test sets
         self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.30, random_state=1, stratify=self.y)
 
@@ -603,8 +660,15 @@ class ClassificationContainer:
 
         for method in self.methods:
             trainer = method()
-            model, score = trainer.train(self.X_train_transformed, self.y_train)
-            print(trainer.name, "\n", " > Score = ", score)
+            model = trainer.train(self.X_train_transformed, self.y_train)
+
+            # Now test the model on the test dataset
+
+            yhat = model.predict(self.X_test_transformed)
+            # evaluate the model
+            acc = accuracy_score(self.y_test, yhat)
+            
+            print(trainer.name, "\n", " > Score = ", acc)
 
             if plot:
                 trainer.plot(self.X_test_transformed, self.X_test, self.y_test)
@@ -646,13 +710,16 @@ if __name__ == '__main__':
 
     plot=True
     image_directory = "images"
-    data = "BisectionFit_2021-11-12--11-40-00.dat"
     data = "MultisectionFit_2021-11-12--16-57-46.dat"
-    print(f"Analysing images from {image_directory}, using data {data}..")
+    data = "BisectionFit_2021-11-12--11-40-00.dat"
+
+    excel_data = 'excel_data.dat'
+    
+    print(f"Analysing images from {image_directory}, using data {data}\n >with excel data {excel_data}..")
 
 
     trainers = [TrainLogisticRegression, TrainSVM]
-    cc = ClassificationContainer(trainers, data, image_directory )
+    cc = ClassificationContainer(trainers, data, image_directory, excel_data )
     cc.train_models(plot=plot)
 
     

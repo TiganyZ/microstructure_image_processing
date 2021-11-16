@@ -287,6 +287,51 @@ class PrimaryAlphaSize(ImageAnalysis):
         comment_str = ' '.join( re.findall("[A-Z][^A-Z]*", self.name) )
         self.comment = "#  pixel_depth  {self.name}[pixels]   >  Analysis of {comment_str}"
 
+        
+    def analyse(self, image, unprocessed_image,  sample_rate = 10, offset = 0):
+        # Take in an an image file, which has been thresholded and has
+        # the bakelite removed and then sample the alpha-beta volume
+        # fraction
+        # p2, p98 = np.percentile(image, (2, 98))
+        # rescaled_image = exposure.rescale_intensity(unprocessed_image, in_range=(p2, p98))
+        self.thresholded_image = unprocessed_image > 0.5*np.max(unprocessed_image)
+        self.lower_boundary, self.mean, self.sigma = calculate_boundary(self.thresholded_image,
+                                                         sample_rate=10, offset = 0., n_sigma=1.)
+
+        fixed_offset = 20
+        offset = self.mean + fixed_offset + 2*self.sigma # + 2*sigma # np.max(lower_boundary[:,1])
+
+        # Now find the difference in pixel heights between the images so we have true calibration
+        removed_pixel_rows = len(unprocessed_image) - len(image)
+
+        offset = int(offset) - removed_pixel_rows
+        if offset < 0:
+            print("A/B fraction analysis: WARNING: offset is less than zero, setting to 0. ")
+            offset = 0
+        
+        n_samples = int((len(image) - int(offset))/float(sample_rate)) 
+
+        
+
+        index = 0
+
+        datax = []
+        datay = []
+        for i, row in enumerate(image):
+            if i > offset:
+                ni = i - int(offset) 
+                if ni % sample_rate == 0:
+                    # Get a row of pixels and find the mean for the
+                    # alpha-beta volume fraction, where values closer
+                    # to 1 are more alpha
+                    datax.append( i )
+                    datay.append( np.mean(image[i-int(sample_rate/4)-1:i+1,:])/255. )
+                    index += 1
+
+        self.data = np.zeros((index, 2))
+        self.data[:,0] = np.asarray(datax)
+        self.data[:,1] = np.asarray(datay)        
+
     def analyse(self, image, unprocessed_image,  sample_rate = 10, offset = 100):
         # Analyse the image file from below the offset
         # > To find the primary alpha size, one can 
