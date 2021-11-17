@@ -350,7 +350,7 @@ class PreprocessContainer:
 
 if __name__ == "__main__":
 
-    plot=0 # False #True
+    plot=1 # False #True
     image_directory =  "images" #"images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
     data_directory = "AlphaBetaFraction_2021-11-04--09-37-03_images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
     denudation_data = "denudation_data.dat"

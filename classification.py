@@ -450,12 +450,21 @@ class TrainSVM(DataTrainer):
 
     def train(self, X, y):
 
-        cv_inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
+        cv_inner = StratifiedKFold(n_splits=3, shuffle=True, random_state=5)
         # define the model
         model = svm.SVC(kernel='linear', random_state=42,probability=True )
         # define search space
         space = dict()
-        space['C'] = [0.1, 1, 10, 1000]
+        linear=True
+
+        if linear:
+            space['C'] = [0.01, 0.1]
+            space['kernel'] = ['rbf']
+            space['gamma'] = [0.1, 0.5, 1, 2 ]
+        else:
+            space['C'] = [0.01, 0.1, 1, 100]
+            #            space['kernel'] = ['linear']
+        #        space['gamma'] = [0.1, 0.5, 1, 2 ]        
         # define search
         search = GridSearchCV(model, space, scoring='accuracy', cv=cv_inner, refit=True)
         # execute search
@@ -471,7 +480,7 @@ class TrainSVM(DataTrainer):
         # print("%0.2f accuracy with a standard deviation of %0.2f" % (scores.mean(), scores.std()))
         return self.model#, scores.mean()
     
-    def plot(self, X_test, X_original, y):
+    def plot(self, X_test, X_original, y, X_train, y_train):
 
         # Plot the test data, the logistic regression curve and the ROC
         
@@ -482,8 +491,8 @@ class TrainSVM(DataTrainer):
   
         fig, ax = plt.subplots(ncols=3, figsize=(12, 3))
 
-
-        ax[0].scatter(X_test[:,0], X_test[:,1], c=y)
+        ax[0].scatter(X_train[:,0], X_train[:,1], c=y_train, alpha=0.1)
+        ax[0].scatter(X_test[:,0], X_test[:,1], c=y, alpha=0.5)
         ax[0].set_xlabel("Surface gradient")
         ax[0].set_ylabel("Surface to bulk ratio")            
 
@@ -499,19 +508,27 @@ class TrainSVM(DataTrainer):
         Z = self.model.decision_function(xy).reshape(XX.shape)
 
 
+        ax[0].imshow(
+            Z,
+            interpolation="nearest",
+            extent=(xx.min(), xx.max(), yy.min(), yy.max()),
+            aspect="auto",
+            origin="lower",
+            cmap=plt.cm.magma,
+        )
         # plot decision boundary and margins
         ax[0].contour(
             XX, YY, Z, colors="k", levels=[-1, 0, 1], alpha=0.5, linestyles=["--", "-", "--"]
         )
         # plot support vectors
-        ax[0].scatter(
-            self.model.support_vectors_[:, 0],
-            self.model.support_vectors_[:, 1],
-            s=10,
-            linewidth=1,
-            facecolors="none",
-            edgecolors="k",
-        )
+        # ax[0].scatter(
+        #     self.model.support_vectors_[:, 0],
+        #     self.model.support_vectors_[:, 1],
+        #     s=10,
+        #     linewidth=1,
+        #     facecolors="none",
+        #     edgecolors="k",
+        # )
 
         ax[1].plot(X_original[:,0], probs[:,0], 'bo')#
         ax[1].set_title(f'SVC predicted probability')
@@ -538,12 +555,12 @@ class TrainLogisticRegression(DataTrainer):
         # print("Logistic regression: \n", metrics.accuracy_score(y, predicted) )
         # print("Logistic regression: \n", metrics.classification_report(y, predicted))
 
-        cv_inner = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
+        cv_inner = StratifiedKFold(n_splits=3, shuffle=True, random_state=3)
         # define the model
         model = LogisticRegression() #(class_weight = 'balanced') #svm.SVC(kernel='linear', random_state=42,probability=True )
         # define search space
         space = dict()
-        space['C'] = [0.1, 1, 10, 1000]
+        space['C'] = [0.01, 0.1, 1, 10, 1000]
         # define search
         search = GridSearchCV(model, space, scoring='accuracy', cv=cv_inner, refit=True)
         # execute search
@@ -569,7 +586,7 @@ class TrainLogisticRegression(DataTrainer):
         # log_reg.predict_proba(X_test)
         return self.model#, scores.mean()
 
-    def plot(self, X_test, X_original, y):
+    def plot(self, X_test, X_original, y, X_train, y_train):
 
         # Plot the test data, the logistic regression curve and the ROC
         
@@ -629,7 +646,23 @@ class ClassificationContainer:
 
         if use_excel:
             excel_images = np.loadtxt(excel_data, skiprows=1, usecols=(0,), dtype=np.str)
-            excel_ratios = np.loadtxt(excel_data, skiprows=1, usecols=(1,), dtype=np.float)
+            excel_ratios_v6 = np.loadtxt(excel_data, skiprows=1, usecols=(1,), dtype=np.float)
+            excel_ratios_v7 = np.loadtxt(excel_data, skiprows=1, usecols=(2,), dtype=np.float)
+            classification_t = np.loadtxt(excel_data, skiprows=1, usecols=(3,), dtype=np.float)
+            classification_c = np.loadtxt(excel_data, skiprows=1, usecols=(4,), dtype=np.float)
+
+            classification = np.zeros(classification_c.shape, dtype=np.int)
+            # Now change the classification to the same type
+            # > Classification C :
+            #    0 – Fully Single Grain Beta Denudation
+            #    1 – Close to Single Grain Beta Denudation
+            #    2 – Diffuse Beta Denudation
+            #    3 – Micro ok
+
+            classification[classification_c == 0] = 3                        
+            classification[classification_c == 1] = 2            
+            classification[classification_c == 2] = 1
+            classification[classification_c == 3] = 0
 
             ratios = np.zeros((self.X.shape[0]))
             for i_ind, ii in enumerate(self.images):
@@ -640,11 +673,11 @@ class ClassificationContainer:
             ratios[ratios < 0] = 0 
             self.X[:,1] = ratios
 
-        # self.X[:,1] = 0.
+        self.X[:,1] = 0.
         
         #        print(self.X)
         # split into train test sets
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.30, random_state=1, stratify=self.y)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.2, random_state=43, stratify=self.y)
 
         self.scaler = preprocessing.StandardScaler().fit(self.X_train)
         self.X_train_transformed = self.scaler.transform(self.X_train)
@@ -669,9 +702,11 @@ class ClassificationContainer:
             acc = accuracy_score(self.y_test, yhat)
             
             print(trainer.name, "\n", " > Score = ", acc)
+            for yp, yt in zip(yhat, self.y_test):
+                print(" y: ", yp, yt, yp == yt)
 
             if plot:
-                trainer.plot(self.X_test_transformed, self.X_test, self.y_test)
+                trainer.plot(self.X_test_transformed, self.X_test, self.y_test, self.X_train_transformed, self.y_train)
             
 
     def create_output_directory(self):
