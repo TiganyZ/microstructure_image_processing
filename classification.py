@@ -457,7 +457,7 @@ class TrainSVM(DataTrainer):
         space = dict()
         linear=True
 
-        if linear:
+        if not linear:
             space['C'] = [0.01, 0.1]
             space['kernel'] = ['rbf']
             space['gamma'] = [0.1, 0.5, 1, 2 ]
@@ -642,14 +642,17 @@ class ClassificationContainer:
 
         self.y = np.loadtxt(data, skiprows=1, usecols=(1,), dtype=np.int)
         # using gradient and ratio for the data
-        self.X = np.loadtxt(data, skiprows=1, usecols=(2,4,), dtype=np.float)
+        self.X = np.loadtxt(data, skiprows=1, usecols=(4,2,), dtype=np.float)
 
         if use_excel:
             excel_images = np.loadtxt(excel_data, skiprows=1, usecols=(0,), dtype=np.str)
+
             excel_ratios_v6 = np.loadtxt(excel_data, skiprows=1, usecols=(1,), dtype=np.float)
             excel_ratios_v7 = np.loadtxt(excel_data, skiprows=1, usecols=(2,), dtype=np.float)
-            classification_t = np.loadtxt(excel_data, skiprows=1, usecols=(3,), dtype=np.float)
-            classification_c = np.loadtxt(excel_data, skiprows=1, usecols=(4,), dtype=np.float)
+            excel_ratios_t  = np.loadtxt(excel_data, skiprows=1, usecols=(3,), dtype=np.float)            
+
+            classification_t = np.loadtxt(excel_data, skiprows=1, usecols=(4,), dtype=np.int)
+            classification_c = np.loadtxt(excel_data, skiprows=1, usecols=(5,), dtype=np.int)
 
             classification = np.zeros(classification_c.shape, dtype=np.int)
             # Now change the classification to the same type
@@ -664,20 +667,26 @@ class ClassificationContainer:
             classification[classification_c == 2] = 1
             classification[classification_c == 3] = 0
 
+            classification[classification == 1] = 0
+            classification[classification == 2] = 1            
+            classification[classification == 3] = 1
+
+
             ratios = np.zeros((self.X.shape[0]))
             for i_ind, ii in enumerate(self.images):
-                for ind, (ei, er) in enumerate(zip(excel_images, excel_ratios)):
+                for ind, (ei, er, c) in enumerate(zip(excel_images, excel_ratios_v7, classification)):
                     if ii.startswith(ei):
                         ratios[i_ind] = er
+                        self.y[i_ind] = c
 
-            ratios[ratios < 0] = 0 
+                        #            ratios[ratios < 0] = 0 
             self.X[:,1] = ratios
 
-        self.X[:,1] = 0.
+            #        self.X[:,1] = 0.
         
         #        print(self.X)
         # split into train test sets
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.2, random_state=43, stratify=self.y)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.3, random_state=42, stratify=self.y)
 
         self.scaler = preprocessing.StandardScaler().fit(self.X_train)
         self.X_train_transformed = self.scaler.transform(self.X_train)
@@ -748,13 +757,15 @@ if __name__ == '__main__':
     data = "MultisectionFit_2021-11-12--16-57-46.dat"
     data = "BisectionFit_2021-11-12--11-40-00.dat"
 
+    data = "MultisectionFit_2021-11-18--15-54-07.dat"
+    
     excel_data = 'excel_data.dat'
     
     print(f"Analysing images from {image_directory}, using data {data}\n >with excel data {excel_data}..")
 
 
     trainers = [TrainLogisticRegression, TrainSVM]
-    cc = ClassificationContainer(trainers, data, image_directory, excel_data )
+    cc = ClassificationContainer(trainers, data, image_directory, excel_data, use_excel=1)
     cc.train_models(plot=plot)
 
     

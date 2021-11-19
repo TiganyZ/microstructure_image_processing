@@ -156,7 +156,7 @@ class AlphaBetaFraction(ImageAnalysis):
         self.name = "AlphaBetaFraction"
         self.comment = "#  pixel_depth  alphabetafraction   >  Analysis of alpha beta fraction"
         
-    def analyse(self, image, unprocessed_image,  sample_rate = 10, offset = 0):
+    def analyse(self, image, unprocessed_image,  sample_rate = 5, offset = 0):
         # Take in an an image file, which has been thresholded and has
         # the bakelite removed and then sample the alpha-beta volume
         # fraction
@@ -166,6 +166,7 @@ class AlphaBetaFraction(ImageAnalysis):
         self.lower_boundary, self.mean, self.sigma = calculate_boundary(self.thresholded_image,
                                                          sample_rate=10, offset = 0., n_sigma=1.)
 
+        self.image = image
         fixed_offset = 20
         offset = self.mean + fixed_offset + 2*self.sigma # + 2*sigma # np.max(lower_boundary[:,1])
 
@@ -180,7 +181,7 @@ class AlphaBetaFraction(ImageAnalysis):
         n_samples = int((len(image) - int(offset))/float(sample_rate)) 
 
         
-
+        self.offset = offset
         index = 0
 
         datax = []
@@ -193,7 +194,7 @@ class AlphaBetaFraction(ImageAnalysis):
                     # alpha-beta volume fraction, where values closer
                     # to 1 are more alpha
                     datax.append( i )
-                    datay.append( np.mean(image[i-int(sample_rate/4)-1:i+1,:])/255. )
+                    datay.append( np.mean(image[i-int(sample_rate/2)-1:i+1,:])/255. )
                     index += 1
 
         self.data = np.zeros((index, 2))
@@ -236,7 +237,7 @@ class AlphaBetaFraction(ImageAnalysis):
         params,cov=curve_fit(self.straight_line, x, y, expected)
         # Get the standard deviations of the parameters (square roots of the # diagonal of the covariance)
         stdevs = np.sqrt(np.diag(cov))# Calculate the residuals
-        label = f" {params[0]:3.1f}*x + {params[1]:3.1f} "
+        label = f" {params[0]:3.1e}*x + {params[1]:3.1e} "
         
         return self.straight_line(x, *params), label
         
@@ -244,24 +245,31 @@ class AlphaBetaFraction(ImageAnalysis):
                         
     def plot(self, original_image):
         
-        fig, ax = plt.subplots(nrows=1, ncols=2)
-        ax[0].plot(self.lower_boundary[:,0], self.lower_boundary[:,1], 'r--', label = "Lower boundary", )
-        ax[0].hlines(self.mean + 3*self.sigma, 0, 1, transform=ax[0].get_yaxis_transform(), label = "Mean + 0.5sig")
+        fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(12, 3))
+        ax[0].plot(self.lower_boundary[:,0], self.lower_boundary[:,1], 'r--', label = "Detected surface" )
+        ax[0].hlines(self.mean + 3*self.sigma, 0, 1, transform=ax[0].get_yaxis_transform(), label = "Surf. μ + 0.5σ")
+        ax[0].legend(bbox_to_anchor=(0.15, -0.4, 0.6, -0.4), loc='lower left',
+                      ncol=1, borderaxespad=0.)
+        # ax[1].imshow(self.thresholded_image, cmap='gray')
+        # ax[1].set_title('Thresholded image')
+
         
-        ax[0].imshow(self.thresholded_image, cmap='gray')
-        ax[0].set_title('Thresholded image')
-        ax[0].axis('off')
+        ax[1].imshow(self.image, cmap='gray')
+        ax[1].set_title('Processed image')
+        ax[1].hlines(self.offset, 0, 1, transform=ax[1].get_yaxis_transform(), label = "Surf. μ + 0.5σ")
+        ax[1].legend(bbox_to_anchor=(0.15, -0.4, 0.6, -0.4), loc='lower left',
+                     ncol=1, borderaxespad=0.)
 
-        ax[1].imshow(original_image, cmap='gray')
-        ax[1].set_title('Original image')
-        fig.tight_layout()
-        plt.show()
-
-        fig, ax = plt.subplots(nrows=1, ncols=2)
-
+        
         ax[0].imshow(original_image, cmap='gray')
         ax[0].set_title('Original image')
-        ax[0].axis('off')
+
+
+        # fig, ax = plt.subplots(nrows=1, ncols=2)
+
+        # ax[0].imshow(original_image, cmap='gray')
+        # ax[0].set_title('Original image')
+        # ax[0].axis('off')
 
         
         try:
@@ -269,13 +277,15 @@ class AlphaBetaFraction(ImageAnalysis):
         except ValueError:
             print("Straight line fit: WARNING: Cannot fit to straight line, will give flat dependence for line")
             y_fit = [0.5 for i in self.data[:,0]]
-            label = f" {0:3.1f}*x + {0.5:3.1f} "
-        ax[1].scatter(self.data[:,0], self.data[:,1], label="data" )
-        ax[1].plot(self.data[:,0], y_fit, label=label)
-        ax[1].set_xlabel("Surface Depth")
-        ax[1].set_ylabel("Alpha-beta fraction")        
-        ax[1].set_title('Alpha-beta volume fraction with surface depth')
-        ax[1].legend()
+            label = f" {0:3.1g}*x + {0.5:3.1g} "
+        ax[2].scatter(self.data[:,0], self.data[:,1], label="data" )
+        ax[2].plot(self.data[:,0], y_fit, 'm-', label=label)
+        ax[2].set_xlabel("Surface Depth")
+        ax[2].set_ylabel("Alpha-beta fraction")        
+        ax[2].set_title('α-β volume frac. vs depth')
+        ax[2].legend()
+        # ax[2].legend(bbox_to_anchor=(0.15, -0.4, 0.6, -0.4), loc='lower left',
+        #              ncol=1, borderaxespad=0.)
         fig.tight_layout()
         plt.show()
 
@@ -286,51 +296,6 @@ class PrimaryAlphaSize(ImageAnalysis):
         self.name = "PrimaryAlphaSize"
         comment_str = ' '.join( re.findall("[A-Z][^A-Z]*", self.name) )
         self.comment = "#  pixel_depth  {self.name}[pixels]   >  Analysis of {comment_str}"
-
-        
-    def analyse(self, image, unprocessed_image,  sample_rate = 10, offset = 0):
-        # Take in an an image file, which has been thresholded and has
-        # the bakelite removed and then sample the alpha-beta volume
-        # fraction
-        # p2, p98 = np.percentile(image, (2, 98))
-        # rescaled_image = exposure.rescale_intensity(unprocessed_image, in_range=(p2, p98))
-        self.thresholded_image = unprocessed_image > 0.5*np.max(unprocessed_image)
-        self.lower_boundary, self.mean, self.sigma = calculate_boundary(self.thresholded_image,
-                                                         sample_rate=10, offset = 0., n_sigma=1.)
-
-        fixed_offset = 20
-        offset = self.mean + fixed_offset + 2*self.sigma # + 2*sigma # np.max(lower_boundary[:,1])
-
-        # Now find the difference in pixel heights between the images so we have true calibration
-        removed_pixel_rows = len(unprocessed_image) - len(image)
-
-        offset = int(offset) - removed_pixel_rows
-        if offset < 0:
-            print("A/B fraction analysis: WARNING: offset is less than zero, setting to 0. ")
-            offset = 0
-        
-        n_samples = int((len(image) - int(offset))/float(sample_rate)) 
-
-        
-
-        index = 0
-
-        datax = []
-        datay = []
-        for i, row in enumerate(image):
-            if i > offset:
-                ni = i - int(offset) 
-                if ni % sample_rate == 0:
-                    # Get a row of pixels and find the mean for the
-                    # alpha-beta volume fraction, where values closer
-                    # to 1 are more alpha
-                    datax.append( i )
-                    datay.append( np.mean(image[i-int(sample_rate/4)-1:i+1,:])/255. )
-                    index += 1
-
-        self.data = np.zeros((index, 2))
-        self.data[:,0] = np.asarray(datax)
-        self.data[:,1] = np.asarray(datay)        
 
     def analyse(self, image, unprocessed_image,  sample_rate = 10, offset = 100):
         # Analyse the image file from below the offset
@@ -403,7 +368,7 @@ class AnalysisContainer:
             unprocessed_image =   color.rgb2gray(imageio.imread(f"{self.original_image_directory}/{unprocessed_name}"))
             self.method.analyse( original_image, unprocessed_image )
             if plot:
-                self.method.plot(original_image)
+                self.method.plot(unprocessed_image)
             
             self.save(image, self.method.data)
 

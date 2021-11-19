@@ -49,17 +49,21 @@ class SegmentData:
 
         return before_data, after_data
 
-    
+
+   
 class LinearFit:
     def flat_line(self, x, c):
         return c
 
     def straight_line(self, x, m, c):
         return m*x + c
+
+    def exponential_line(self, x, A, b, c):
+        return A * np.exp( -b * x ) + c
     
     def fit_curve(self, data, expected, func):
         x, y = data[:,0], data[:,1]
-        params,cov=curve_fit(func, x, y, expected)
+        params,cov=curve_fit(func, x, y, expected, maxfev=1000)
         stdevs = np.sqrt(np.diag(cov))
         return params, stdevs        
 
@@ -77,6 +81,13 @@ class LinearFit:
               "expected" : (-1/2500., 0.7)}
         return d
     
+    def exponential(self, data):
+        d = { "data" : data,
+              "name" : "exponential line",
+              "func" : self.exponential_line,
+              "expected" : (5., 0.005, 0.7)}
+        return d
+    
 
     def fit(self, data=None, func=None, expected=None, name=""):
         try:
@@ -85,6 +96,11 @@ class LinearFit:
             print(f"{name} fit: WARNING: Cannot fit to {name}, will give flat dependence for line")
             params = expected
             stdevs = np.array([1 for i in params])
+        except RuntimeError:
+            print(f"{name} fit: WARNING: Cannot fit to {name} after many iterations, will give flat dependence")
+            params = (0., 0.000, 0.7)
+            stdevs = np.array([1 for i in params])
+
         return params, stdevs
     
 
@@ -168,22 +184,26 @@ class MultisectionFit(DataAnalysis):
     def __init__(self):
         self.fit = LinearFit()
         self.name = "MultisectionFit"
-        self.comment = "# Gradient_from_surface[ab_frac/pixel] mean_in_bulk[ab_frac] surface_bulk_ratio"
+        self.comment = "# DecayCoefficient[ab_frac/pixel] mean_in_bulk[ab_frac] surface_bulk_ratio"
 
     def compare_methods(self, linear_data, flat_data):
         self.params_flat,     self.stdevs_flat     = self.fit.fit(**self.fit.flat(flat_data))
-        self.params_straight, self.stdevs_straight = self.fit.fit(**self.fit.straight(linear_data))
+        self.params_exponential, self.stdevs_exponential = self.fit.fit(**self.fit.exponential(linear_data))
+
+        # self.params_straight, self.stdevs_straight = self.fit.fit(**self.fit.straight(linear_data))
 
         # compare the standard deviation between the points and see what fits better
         # Extent of data before
-        mean_fit = (  self.fit.straight_line( self.before[ 0,0], self.params_straight[0], self.params_straight[1])
-                    + self.fit.straight_line( self.before[-1,0], self.params_straight[0], self.params_straight[1]) ) / 2
+        # mean_fit = (  self.fit.straight_line( self.before[ 0,0], self.params_straight[0], self.params_straight[1])
+        #             + self.fit.straight_line( self.before[-1,0], self.params_straight[0], self.params_straight[1]) ) / 2
+        mean_fit = np.mean(self.before[:,1])
         f_data = self.params_flat[0], self.stdevs_flat[0]
-        s_data_g, s_data_i = (self.params_straight[0], self.stdevs_straight[0]), (self.params_straight[1], self.stdevs_straight[1])
+        s_data_g, s_data_i = (self.params_exponential[0], self.stdevs_exponential[0]), (self.params_exponential[1], self.stdevs_exponential[1])
 
         # self.data = "{self.params_straight[0]} {self.stdevs_straight[0]} {self.params_straight[1]} {self.stdevs_straight[0]} {self.params_flat[0]} {self.stdevs_flat[0]} \n"
 
-        self.data = f"{self.params_straight[0]} {self.params_flat[0]} {mean_fit/self.params_flat[0]}\n"
+        #        self.data = f"{self.params_straight[0]} {self.params_flat[0]} {mean_fit/self.params_flat[0]}\n"
+        self.data = f"{self.params_exponential[1]} {self.params_flat[0]} {mean_fit/self.params_flat[0]}\n"        
         return f_data, s_data_g, s_data_i
         
 
@@ -198,12 +218,12 @@ class MultisectionFit(DataAnalysis):
 
         line = (np.max(self.before[:,0]) + np.min(self.before[:,0])) / 2.
         segment2 = SegmentData(self.before, line)
-        self.before1, self.before2 = segment2.segment_data()
+        self.before, self.before2 = segment2.segment_data()
 
 
-        line = (np.max(self.before1[:,0]) + np.min(self.before1[:,0])) / 2.
-        segment2 = SegmentData(self.before1, line)
-        self.before, self.before12 = segment2.segment_data()
+        # line = (np.max(self.before1[:,0]) + np.min(self.before1[:,0])) / 2.
+        # segment2 = SegmentData(self.before1, line)
+        # self.before, self.before12 = segment2.segment_data()
         
         
         # On the segmented data I could do cross validation to find
@@ -220,9 +240,15 @@ class MultisectionFit(DataAnalysis):
 
         ax[1].plot(self.original_data[:,0], self.original_data[:,1])
 
-        yb  = self.fit.straight_line(self.before[:,0], self.params_straight[0], self.params_straight[1])
-        yb1 = self.fit.straight_line(self.before[:,0], self.params_straight[0] + self.stdevs_straight[0], self.params_straight[1] + self.stdevs_straight[1])
-        yb2 = self.fit.straight_line(self.before[:,0], self.params_straight[0] - self.stdevs_straight[0], self.params_straight[1] - self.stdevs_straight[1])
+        yb  = self.fit.exponential_line(self.before[:,0], self.params_exponential[0], self.params_exponential[1], self.params_exponential[2])
+        yb1 = self.fit.exponential_line(self.before[:,0],
+                                        self.params_exponential[0] + self.stdevs_exponential[0],
+                                        self.params_exponential[1] - self.stdevs_exponential[1],
+                                        self.params_exponential[2] - self.stdevs_exponential[2])
+        yb2 = self.fit.exponential_line(self.before[:,0],
+                                        self.params_exponential[0] - self.stdevs_exponential[0],
+                                        self.params_exponential[1] + self.stdevs_exponential[1],
+                                        self.params_exponential[2] + self.stdevs_exponential[2])
 
 
         ya  = np.array( [ self.fit.flat_line(val, self.params_flat[0])                       for val in self.after[:,0] ] )
@@ -230,13 +256,13 @@ class MultisectionFit(DataAnalysis):
         ya2 = np.array( [ self.fit.flat_line(val, self.params_flat[0] - self.stdevs_flat[0]) for val in self.after[:,0] ] )
 
         
-        ax[1].plot(self.before[:,0], yb, 'r-')
+        ax[1].plot(self.before[:,0], yb, 'r-', label="Denudation fit")
         ax[1].plot(self.before[:,0], yb1, 'g--')
         ax[1].plot(self.before[:,0], yb2, 'g--')
         ax[1].fill_between(self.before[:,0], yb1, yb2, facecolor="gray", alpha=0.15)
 
         print("Segmented data: ",self.before.shape, self.after.shape)
-        ax[1].plot(self.after[:,0], ya, 'b-')
+        ax[1].plot(self.after[:,0], ya, 'b-', label = "Bulk mean")
         ax[1].plot(self.after[:,0], ya1, 'm--')
         ax[1].plot(self.after[:,0], ya2, 'm--')
         ax[1].fill_between(self.after[:,0], ya1, ya2, facecolor="gray", alpha=0.15)
@@ -244,7 +270,8 @@ class MultisectionFit(DataAnalysis):
         
         ax[1].set_xlabel("Surface Depth")
         ax[1].set_ylabel("Alpha-beta fraction")        
-        ax[1].set_title('Alpha-beta volume fraction with surface depth')
+        ax[1].set_title('Alpha-beta volume fraction vs depth')
+        ax[1].legend()
         fig.tight_layout()
         plt.show()
         
@@ -350,9 +377,9 @@ class PreprocessContainer:
 
 if __name__ == "__main__":
 
-    plot=1 # False #True
+    plot=0 # False #True
     image_directory =  "images" #"images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
-    data_directory = "AlphaBetaFraction_2021-11-04--09-37-03_images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
+    data_directory = "AlphaBetaFraction_2021-11-18--15-20-04_images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
     denudation_data = "denudation_data.dat"
     print(f"Preprocessing data from {data_directory}, with images from {image_directory}..")
     # Now analyse

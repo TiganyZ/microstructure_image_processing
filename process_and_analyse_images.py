@@ -38,7 +38,7 @@ plot=False
     
 #     image_directory = pc.dir_name
 
-
+plot=1
 
 original_image_directory = "images_WhiteBackgroundRemoval"
 original_image_directory = "images"
@@ -52,9 +52,9 @@ analysis = AlphaBetaFraction
 ac = AnalysisContainer(analysis, image_directory, original_image_directory)
 ac.analyse_images(plot=plot)
 
-# print(f"> Chris Alpha-beta fraction")    
-# analysis = ChrisAlphaBetaFraction
-# ac = AnalysisContainer(analysis, image_directory, original_image_directory)
-# ac.analyse_images(plot=plot)
+print(f"> Chris Alpha-beta fraction")    
+analysis = ChrisAlphaBetaFraction
+ac = AnalysisContainer(analysis, image_directory, original_image_directory)
+ac.analyse_images(plot=plot)
 
 
