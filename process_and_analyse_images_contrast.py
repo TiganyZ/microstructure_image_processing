@@ -17,7 +17,7 @@ from classification import *
 import copy
 import sys
 
-plot=False
+plot=True
 
 # Get arguments from commandline
 if len(sys.argv) > 1:
@@ -29,7 +29,7 @@ if len(sys.argv) > 1:
         image_directory = sys.argv[1]
 
 else:
-    image_directory = "images"
+    image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization"
 
 original_image_directory = copy.deepcopy(image_directory)
 
@@ -41,6 +41,8 @@ print(f"Starting to process images from {image_directory}...")
 # processes = [RemoveBakelite, WhiteBackgroundRemoval,  HistogramEquilization]
 
 processes = [ RemoveBakeliteBoundary, WhiteBackgroundRemoval, OtsuThreshold]
+
+processes = [ RandomWalkerSegmentation]
 arguments = [{} for process in processes ] 
 
 

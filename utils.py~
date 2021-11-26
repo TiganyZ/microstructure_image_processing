@@ -20,7 +20,7 @@ def filter_black_regions(start, final, count, critical_depth = 200.):
 
     return critical_depth, critical_depth, 0
 
-def calculate_black_regions(line, critical_depth=100, critical=False):
+def calculate_black_regions(line):
     low, high = np.min(line), np.max(line)
     black_regions = np.zeros(line.shape)
     count = 0
@@ -44,10 +44,7 @@ def calculate_black_regions(line, critical_depth=100, critical=False):
                 final.append(ind)
                 count.append(0)
 
-    if critical:
-        return filter_black_regions(start, final, count, critical_depth = critical_depth )
-    else:
-        return start[0], final[0], count[0]
+    return filter_black_regions(start, final, count, critical_depth = 0.3 * len(line) )
 
 def calculate_boundary(image, sample_rate=10, offset = 0., n_sigma=3.):
     # Sample from the top
@@ -71,9 +68,9 @@ def calculate_boundary(image, sample_rate=10, offset = 0., n_sigma=3.):
             # Count the pixels which are black
 
             # Find the maximum, continuous portion of black in image in top
-            start, depth, size = calculate_black_regions(image[:,i], critical_depth=0.2*image.shape[1])
+            start, depth, size = calculate_black_regions(image[:,i])
 
-            if depth < 0.2 * height:
+            if depth < 0.3 * height:
                 # Count it as black region:
                 surface_x.append(i)
                 surface_y.append(depth)

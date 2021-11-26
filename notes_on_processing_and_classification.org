@@ -1,0 +1,185 @@
+#+TITLE: Notes on the development of microstructural analysis and classification of beta denudation
+#+AUTHOR: Tigany Zarrouk 
+
+* Introduction 
+These are notes on image processing of Ti-64 microstructures, what
+I've found are optimal ways to process the images for data extraction
+and then the classification of the images: whether we see beta
+denudation, whether we see an even distribution of alpha and beta, or
+whether we see the opposite of beta denudation (more alpha with
+surface depth).
+
+* Image Processing
+Image processing was achieved through the ~scikit-image~ module in python. 
+
+In all images, one found a region of bakelite which is always at the
+top of the image, which is generally darker than the alpha and beta
+phases, which are white and grey respectively.
+
+** Bakelite Detection
+
+One had to find ways to detect the bakelite. Original methods from
+Chris Arygakis did this by finding the first maxima in intensity
+(which corresponds to the alpha phase), in a line drawn from the top
+of the image, which had been thresholded.
+
+I opted to sample columns of pixels and then analyse these lines for
+regions of continuous black pixels (when thresholded). If there was a
+maxima found in the first 30% of the image, then one deemed that this
+was a bakelite region, and thus one could put a point there, which is
+the surface of the sample. This was repeated across the width of the
+image, thus giving a rough sampling of titanium surface from which the
+volume fraction of alpha/beta can be found.
+
+** Volume fraction sampling
+
+The sampling of volume fraction was done by sampling a thresholded
+image and taking the mean of pixel values, starting from just below
+the surface into the bulk.
+
+The images first had their background removed by a rolling ball
+algorithm. The ball radius was set to 100px as this was the size of
+the largest feature in the image. The resulting image then had its
+contrast enhanced by contrast stretching: the pixel intensities were
+redistributed between the lowest and highest values (0 and 1
+respectively) rather than being concentrated at high values. This
+resulted in a greyscale image in which microstructural
+features were enhanced. 
+
+The image was then segmented into its two separate phases by a Random
+Walker algorithm, whereby "seeds" (starting positions) of randomly
+diffusing "agents" were positioned at the extremal values of the image
+(at places most likely to be alpha/beta) whereby they subsequently
+diffuse over the whole image. In diffusion, they "paint" the pixels
+their respective maximal value, white (1) for those particles which
+start in the alpha phase, and black (0) for those which start in the
+beta phase. Local gradients provide "hills" or obstacles for walkers,
+such that they inhibit diffusion in that direction. Therefore, large
+changes in pixel values---the alpha/beta phase boundaries---will
+prohibit a walker from moving. The result of this algorithm is a
+segmentation of the image into alpha (white) and beta (black) values,
+from which we can perform analysis of the alpha-beta volume fraction.
+
+Then the images were thresholded by use of the Otsu threshold
+algorithm which essentially partitions a bimodal distribution of pixel
+intensities, which is what one expects in a alpha/beta phase structure. 
+
+One found that globally, the spread in the volume fraction with depth was significant, with a +- 20% difference across the whole sample. 
+
+** Improvements to be made 
+
+Really, to properly analyse the images one must use the inputs and outputs of various processing techniques. 
+For an optimal threshold, the bakelie must be removed as it skews the pixel intensities such that the threshold is too low. 
+
+Optimal Route (processing read from right to left): 
+
+A <= Extracted threshold value <- OtsuThreshold <- WhiteBackgroundRemoval <- RemoveBakelite
+B <= Threshold A <- WhiteBackgroundRemoval
+
+C <= Surface Detection <- Original Image + Threshold
+
+D <= Alpha-beta fraction analysis <- C 
+
+
+
+
+* Classification of beta denudation
+
+Beta denudation is defined as an abnormal increase in the volume
+fraction of the alpha phase at the surface compared to bulk values.
+When a sample is denudated, there is a clear decrease in the volume fraction
+of alpha in going from the surface to the bulk. The distance over
+which this decay occurs varies depending on the sample. 
+
+In order to detect beta denudation, we need a variable/predictor by
+which to determine whether there is beta denudation or not. A prior
+measure was to define a surface depth after which alpha-beta volume
+fraction data is considered to be bulk. A ratio of the average volume
+fractions before and after this threshold were calculated.
+
+However, analysing this data, one cannot see a clear correlation
+between this ratio and beta denudation. This is likely due to the
+large amount of noise in the alpha-beta volume fraction data.
+
+A better predictor can be created by analysing the decrease in alpha
+volume fraction from the surface. To measure this in a standardised
+way, it was determined that all data after a certain depth was
+bulk. This was arbitrarily set to halfway between the surface and the
+bottom of the image. The alpha-beta volume fraction data was segmented
+by this depth, giving data corresponding to the two regions: surface
+and bulk. The data which corresponded to the surface was fitted to a
+straight line using a linear regression, and the gradient
+recorded. The ratio of volume fractions between surface and bulk was
+measured between the regions as well, as a control test. 
+
+
+To test the gradient predictor against the ratio of volume fractions,
+one fitted machine learning models which were trained to give probabilities
+of a sample being denudated or not. The classificaton of each of the
+images was done based on human judgement, as such there is an error
+associated with the classification itself.
+
+To train the models, one partitioned image data into a training
+dataset and a test dataset, in the proportion of 7:3. This partitoning
+was stratified, such that there was the same proportion of
+classifications (denudated or normal) from the population, in each of
+the training and test datasets. Five-fold cross validation was
+performed on the training data set to train the hyperparameters of
+each of the models: strength of regularisation used for the
+optimisation. The trained models, were then tested on the unseen test
+set, and the ratio to right and wrong (the accurac)classification was performed, was used as a test for the models.
+
+Logistic regression and support vector classification models were trained on the training data sets. 
+
+#+CAPTION: ImageJ analysis of particular image. 
+[[file:2021-11-02_images/figures/I062438_imagej_analysed.jpg]]
+
+#+CAPTION: Analysis of image, which involved (left) detection of the bakelite surface (red, dashed line), with the effective starting surface denoted by the blue line, (middle) the processed image, which has had most of the bakelite removed, along with the background, with the surface superimposed and (right) the alpha/beta fraction as a function of surface depth.
+[[file:2021-11-02_images/figures/analyse_data_surface_detection_and_data_extraction.png]]
+
+#+CAPTION: Extraction of gradient from denudated sample, were volume fraction data was split into surface and bulk segments. 
+[[file:2021-11-02_images/figures/preprocess_data_gradient_extraction_denudated.png]]
+
+
+
+This gradient was then used as a predictor. Logistic regression was
+used as a model to classify the probability of a particular sample belonging 
+
+# To determine denudation depth, one could do statistical analysis to
+# determine a threshold depth which defines what is bulk, and what is
+# surface. However, the data obtained is noisy, which makes a true
+# determination of what is
+
+
+# It becomes
+# clear that there is no simple way of defining what is the bulk and
+# what is the sample in defining what is the bulk and what is the
+# surface. One might simply try to check if beta denudation complicated
+# by the fact that there is a significant amount of noise in the
+# alpha-beta volume fraction data.
+
+
+
+
+
+
+# To classify the presence of beta denudation, one first had to see if the volume fraction data from a give
+* Results
+
+** Classification
+*** We see that the ratios and the classification of Chris Collins correlates well 
+
+Surface to bulk ratios from ImageJ
+
+| Method                 | Accuracy Score |
+|------------------------+----------------|
+| Logistic Regression    |          85.5% |
+| Support Vector Machine |          84.2% |
+
+
+[[file:2021-11-02_images/figures/logreg_classification_ratiov7_chrisclass.png]]
+[[file:2021-11-02_images/figures/svm_classification_ratiov7_chrisclass.png]]
+
+
+
+

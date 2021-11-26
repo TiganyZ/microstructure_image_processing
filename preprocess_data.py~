@@ -422,7 +422,7 @@ class PreprocessContainer:
 
 if __name__ == "__main__":
 
-    plot=1 # False #True
+    plot=0 # False #True
     image_directory =  "images" #"images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
     data_directory = "AlphaBetaFraction_2021-11-23--12-44-13_images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold"
     # data_directory = "AlphaBetaFraction_2021-11-24--16-05-20_images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation"
@@ -430,8 +430,6 @@ if __name__ == "__main__":
     # data_directory="AlphaBetaFraction_2021-11-24--17-02-36_images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation"
 
     data_directory = "AlphaBetaFraction_2021-11-26--12-11-12_images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold"
-
-    data_directory = "AlphaBetaFraction_2021-11-26--14-23-38_images_imageJ_analysed"
     denudation_data = "denudation_data_new.dat"
     print(f"Preprocessing data from {data_directory}, with images from {image_directory}..")
     # Now analyse

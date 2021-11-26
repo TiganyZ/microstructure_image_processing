@@ -435,8 +435,6 @@ if __name__ == '__main__':
     image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation"
 
     image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold"
-
-    image_directory = "images_imageJ_analysed"
     print(f"Analysing images from {image_directory}..")    
     # Now analyse
     # print(f"> Alpha-beta fraction")    

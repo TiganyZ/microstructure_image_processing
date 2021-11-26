@@ -26,7 +26,7 @@ from copy import copy, deepcopy
 from skimage import  feature, color, data, restoration, exposure, img_as_float, img_as_uint, img_as_ubyte, util
 from skimage.filters import threshold_otsu, threshold_sauvola, threshold_niblack, difference_of_gaussians, window, scharr, sobel, roberts
 from skimage.segmentation import random_walker
-from skimage.morphology import reconstruction, disk, white_tophat
+from skimage.morphology import reconstruction
 
 from scipy.fftpack import fftn, fftshift, fft2, ifft2
 
@@ -577,8 +577,8 @@ class HistogramEquilization(ProcessImage):
         # Equalization
         self.image_eq = exposure.equalize_hist(image)
         
-        # # Adaptive Equalization
-        # self.image_adapteq = exposure.equalize_adapthist(image, clip_limit=0.03)
+        # Adaptive Equalization
+        self.image_adapteq = exposure.equalize_adapthist(image, clip_limit=0.03)
         self.output = self.image_rescale
         
         
@@ -974,8 +974,6 @@ class RandomWalkerSegmentation(ProcessImage):
 
         # Run random walker algorithm
         self.output = random_walker(image, self.markers, beta=10, mode='bf')
-        self.output = exposure.rescale_intensity(self.output, in_range=(1, 2),
-                                                 out_range=(0, 1))
 
     def plot(self, original_image):
         # Plot results
@@ -1007,11 +1005,9 @@ class ErosionSegmentation:
 
     def process(self, image):
 
-        selem =  disk(20)
-        self.output = util.invert(white_tophat(util.invert(image), selem))
-        # seed = np.copy(image)
-        # seed[1:-1, 1:-1] = image.max()
-        # self.output = reconstruction(seed, image, method='erosion')
+        seed = np.copy(image)
+        seed[1:-1, 1:-1] = image.max()
+        self.output = reconstruction(seed, image, method='erosion')
 
     def plot(self, original_image):
         fig, ax = plt.subplots(2, 1, figsize=(6, 4), sharex=True, sharey=True)
