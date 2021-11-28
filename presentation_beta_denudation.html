@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Automatic detection of beta-denudated Ti-64 using machine learning</title>
+<meta name="author" content="Tigany Zarrouk"/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="file:///home/tigany/.emacs.d/elpa/emacs-reveal/emacs-reveal-submodules/reveal.js/dist/reveal.css"/>
+
+<link rel="stylesheet" href="file:///home/tigany/.emacs.d/elpa/emacs-reveal/emacs-reveal-submodules/reveal.js/dist/theme/solarized.css" id="theme"/>
+
+<link rel="stylesheet" href="./reveal.js/plugin/accessibility/helper.css"/>
+
+<link rel="stylesheet" href="./reveal.js/plugin/toc-progress/toc-progress.css"/>
+
+<link rel="stylesheet" href="./reveal.js/dist/theme/toc-style.css"/>
+
+<link rel="stylesheet" href="./reveal.js/dist/theme/fonts/source-sans-pro/source-sans-pro.css"/>
+
+<link rel="stylesheet" href="./extra.css"/>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide" data-state="no-toc-progress">
+<!-- The following copyright information only applies to the title slide. -->
+<!-- SPDX-FileCopyrightText: 2017-2020 Tigany Zarrouk -->
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+<!-- This is an HTML template for the title slide. -->
+<!-- Embed logos as necessary. -->
+<!-- <a class="nooutlink" href="url"><img class="state-background your-logo-class" src="whatever.png" alt="Whatever" /></a> -->
+<div class="talk-title">
+    <h1 class="no-toc-progress">Automatic detection of beta-denudated Ti-64 using machine learning</h1>
+</div>
+<div class="talk-subtitle">
+    <p></p>
+</div>
+<div class="talk-author">
+  <a href="https://kclpure.kcl.ac.uk/portal/en/persons/tigany-zarrouk(6386ac58-2d9f-4517-8c34-aa9f330bbec9).html">Tigany Zarrouk</a>
+  <p style="font-size: 0.8em"><a href="tigany.zarrouk@kcl.ac.uk">tigany.zarrouk@kcl.ac.uk</a></p><!-- <br /> -->
+</div>
+<!-- <div class="grid"> -->
+<!--   <div class="col"> -->
+<!--     <a href="https://kclpure.kcl.ac.uk/portal/en/persons/tigany-zarrouk(6386ac58-2d9f-4517-8c34-aa9f330bbec9).html"><img class="logo-middle"  src="./rr-logo.png"  ></img></a> -->
+<!--   </div> -->
+<!-- </div> -->
+
+</section>
+
+<section>
+<section id="slide-orgb01de6f">
+<h2 id="orgb01de6f">Introduction</h2>
+<ul>
+<li>Beta denudation, reduction of the beta phase, seen in some surface
+samples of Ti-64.</li>
+<li>This microstructural degredation increases potential for failure.</li>
+<li>Detection usually a manual process, involving measurement by hand,
+with human judgement, one-by-one.</li>
+<li>Automation of detection will provide a quick and useful &ldquo;second
+opinion&rdquo; to guide judgement of whether a sample is beta
+denudated.</li>
+
+</ul>
+<div class="slide-footer"><br></div>
+</section>
+</section>
+<section>
+<section id="slide-orgbb89936">
+<h2 id="orgbb89936">Motivation</h2>
+</section>
+</section>
+<section>
+<section id="slide-org2e79bc5">
+<h2 id="org2e79bc5">Method</h2>
+<ul>
+<li>Process optical image to enhance the alpha-beta microstructure.</li>
+<li>Extract the alpha-beta volume fraction from image.</li>
+<li>Analyse volume fraction data to give a predictor variable</li>
+<li>Feed the predictor variable into the machine learning model which
+will give a &ldquo;yes/no&rdquo; answer as to whether the sample is denudated,
+with a probability.</li>
+<li>Repeat for all images.</li>
+
+</ul>
+<div class="slide-footer"><br></div>
+
+</section>
+<section id="slide-orgade1224">
+<h3 id="orgade1224">Technical details</h3>
+<ul>
+<li>Train a machine learning model (support vector machine/logistic
+regression) on a training set of data.</li>
+<li>Training set is 200 images, which were classified by myself and
+Chris Collins.</li>
+<li>Test set of data used to test the predictions of the model on
+unseen data.</li>
+<li>Accuracy score gives our confidence in the machine learning
+model.</li>
+
+</ul>
+<div class="slide-footer"><br></div>
+
+</section>
+</section>
+<section>
+<section id="slide-org20e55e4">
+<h2 id="org20e55e4">Image Processing</h2>
+<div class="column" style="float:left; width: 48%">
+
+<div id="orge2d6a25" class="figure">
+<p><img src="figures/I062438.jpg" alt="I062438.jpg" width="80% ;">
+</p>
+</div>
+
+<div id="orge191284" class="figure">
+<p><img src="figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg" alt="I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg" width="80% ;">
+</p>
+</div>
+</div>
+
+<div class="column" style="float:right; width: 48%">
+
+<div id="org6b508dc" class="figure">
+<p><img src="figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg" alt="I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg" width="80% ;">
+</p>
+</div>
+
+<div id="orgf151e8f" class="figure">
+<p><img src="figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold.jpg" alt="I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold.jpg" width="80% ;">
+</p>
+</div>
+</div>
+<div class="slide-footer"><br></div>
+
+
+</section>
+<section id="slide-org2e45e7b">
+<h3 id="org2e45e7b">Comparing to macro</h3>
+<div class="column" style="float:left; width: 48%">
+
+<div id="org6351ada" class="figure">
+<p><img src="figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation.jpg" alt="I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation.jpg">
+</p>
+</div>
+</div>
+<div class="column" style="float:right; width: 48%">
+
+<div id="org46ce4cd" class="figure">
+<p><img src="figures/I062438.jpg_analysed.jpg" alt="I062438.jpg_analysed.jpg">
+</p>
+</div>
+</div>
+<div class="slide-footer"><br></div>
+
+</section>
+</section>
+<section>
+<section id="slide-orgee5cf36">
+<h2 id="orgee5cf36">Extraction of Volume fraction</h2>
+
+<div id="orgf4d9d43" class="figure">
+<p><img src="figures/analyse_data_surface_detection_and_data_extraction.png" alt="analyse_data_surface_detection_and_data_extraction.png">
+</p>
+</div>
+
+
+<div id="org1c81456" class="figure">
+<p><img src="figures/analyse_data_surface_detection_and_data_extraction_denudated.png" alt="analyse_data_surface_detection_and_data_extraction_denudated.png">
+</p>
+</div>
+<div class="slide-footer"><br></div>
+
+</section>
+</section>
+<section>
+<section id="slide-org16517d4">
+<h2 id="org16517d4">Analysis of Volume fraction</h2>
+
+<div id="org178a828" class="figure">
+<p><img src="figures/preprocess_data_gradient_extraction_denudated.png" alt="preprocess_data_gradient_extraction_denudated.png">
+</p>
+</div>
+<div class="slide-footer"><br></div>
+
+</section>
+</section>
+<section>
+<section id="slide-org31aa799">
+<h2 id="org31aa799">Classification</h2>
+</section>
+</section>
+</div>
+</div>
+<script src="file:///home/tigany/.emacs.d/elpa/emacs-reveal/emacs-reveal-submodules/reveal.js/dist/reveal.js"></script>
+<script src="file:///home/tigany/.emacs.d/elpa/emacs-reveal/emacs-reveal-submodules/reveal.js/plugin/notes/notes.js"></script>
+<script src="file:///home/tigany/.emacs.d/elpa/emacs-reveal/emacs-reveal-submodules/reveal.js/plugin/search/search.js"></script>
+<script src="file:///home/tigany/.emacs.d/elpa/emacs-reveal/emacs-reveal-submodules/reveal.js/plugin/zoom/zoom.js"></script>
+<script src="./reveal.js/dist/theme/hidelinks.js"></script>
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+
+controls: true,
+progress: true,
+history: true,
+center: true,
+slideNumber: 'h/v',
+rollingLinks: false,
+keyboard: true,
+mouseWheel: true,
+fragmentInURL: true,
+hashOneBasedIndex: false,
+pdfSeparateFragments: false,
+
+overview: true,
+width: 1400,
+height: 1000,
+
+transition: 'linear',
+transitionSpeed: 'default',
+showNotes: window.location.search.match( /print-pdf/gi ) ? 'separate-page' : false,
+
+// Plugins with reveal.js 4.x
+plugins: [ RevealNotes, RevealSearch, RevealZoom ],
+
+// Optional libraries used to extend reveal.js
+dependencies: [
+]
+
+});
+</script>
+</body>
+</html>

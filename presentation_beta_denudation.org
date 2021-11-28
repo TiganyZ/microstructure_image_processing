@@ -1,0 +1,97 @@
+#+ATTR_HTML: font-size: 1em
+#+TITLE: Automatic detection of beta-denudated Ti-64 using machine learning
+#
+#+Author: Tigany Zarrouk
+#+Date: 25.11.2021
+#+Email: tigany.zarrouk@kcl.ac.uk
+
+#+REVEAL_ROOT: file:///home/tigany/.emacs.d/elpa/emacs-reveal/emacs-reveal-submodules/reveal.js
+# /home/tigany/software/reveal.js
+#+LATEX_HEADER: \usepackage[backend=biber,style=abbrv]{biblatex}
+#+LATEX_HEADER: \usepackage{graphicx}
+# #+LATEX_HEADER: \addbibresource{../bibliography/zoteroLibrary.bib}
+# #+BIBLIOGRAPHY: ../bibliography/zoteroLibrary.bib
+
+#+INCLUDE: "~/.emacs.d/oer-reveal-org/config.org"
+
+#+OPTIONS: toc:nil reveal_width:1400 reveal_height:1000
+#+REVEAL_THEME: solarized
+#+REVEAL_TRANS: linear
+
+#+OPTIONS: author:t email:t
+#+OPTIONS: num:nil toc:nil reveal_slide_number:h/v
+#+REVEAL_EXTRA_JS: { src: 'vid.js', async: true, condition: function() { return !!document.body.classList; } }
+#+REVEAL_EXTERNAL_PLUGINS:({src: "%splugins/chart.js"}”)
+#+REVEAL_EXTRA_CSS: ./extra.css
+
+#+REVEAL_TITLE_SLIDE: title-slide_sasha.html
+
+* Introduction
+  - Beta denudation, reduction of the beta phase, seen in some surface
+    samples of Ti-64.
+  - This microstructural degredation increases potential for failure.
+  - Detection usually a manual process, involving measurement by hand,
+    with human judgement, one-by-one.
+  - Automation of detection will provide a quick and useful "second
+    opinion" to guide judgement of whether a sample is beta
+    denudated.
+* Motivation
+* Method
+  - Process optical image to enhance the alpha-beta microstructure.
+  - Extract the alpha-beta volume fraction from image.
+  - Analyse volume fraction data to give a predictor variable
+  - Feed the predictor variable into the machine learning model which
+    will give a "yes/no" answer as to whether the sample is denudated,
+    with a probability.
+  - Repeat for all images.
+
+** Technical details
+   - Train a machine learning model (support vector machine/logistic
+     regression) on a training set of data.
+   - Training set is 200 images, which were classified by myself and
+     Chris Collins.
+   - Test set of data used to test the predictions of the model on
+     unseen data.
+   - Accuracy score gives our confidence in the machine learning
+     model.
+
+* Image Processing
+
+
+#+NAME: TBE band structure
+#+REVEAL_HTML: <div class="column" style="float:left; width: 48%">
+#+ATTR_HTML: :width 80% ;
+[[file:figures/I062438.jpg]]
+#+ATTR_HTML: :width 80% ;
+[[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg]]
+#+REVEAL_HTML: </div>
+
+#+ATTR_REVEAL: :frag fade-in
+#+REVEAL_HTML: <div class="column" style="float:right; width: 48%">
+#+ATTR_HTML: :width 80% ;
+[[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg]]
+#+ATTR_HTML: :width 80% ;
+[[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold.jpg]]
+#+REVEAL_HTML: </div>
+
+
+** Comparing to macro
+
+#+REVEAL_HTML: <div class="column" style="float:left; width: 48%">
+[[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation.jpg]]
+#+REVEAL_HTML: </div>
+#+REVEAL_HTML: <div class="column" style="float:right; width: 48%">
+[[file:figures/I062438.jpg_analysed.jpg]]
+#+REVEAL_HTML: </div>
+
+* Extraction of Volume fraction
+
+  [[file:figures/analyse_data_surface_detection_and_data_extraction.png]]
+
+  [[file:figures/analyse_data_surface_detection_and_data_extraction_denudated.png]]
+
+* Analysis of Volume fraction
+
+  [[file:figures/preprocess_data_gradient_extraction_denudated.png]]
+
+* Classification

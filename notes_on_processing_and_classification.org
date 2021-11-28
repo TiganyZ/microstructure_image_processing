@@ -66,6 +66,14 @@ intensities, which is what one expects in a alpha/beta phase structure.
 
 One found that globally, the spread in the volume fraction with depth was significant, with a +- 20% difference across the whole sample. 
 
+** Extraction of image data
+
+   [[file:figures/I062438.jpg]]
+   [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg]]
+   [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg]]
+   [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation.jpg]]
+   [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold.jpg]]
+
 ** Improvements to be made 
 
 Really, to properly analyse the images one must use the inputs and outputs of various processing techniques. 
@@ -127,7 +135,7 @@ the training and test datasets. Five-fold cross validation was
 performed on the training data set to train the hyperparameters of
 each of the models: strength of regularisation used for the
 optimisation. The trained models, were then tested on the unseen test
-set, and the ratio to right and wrong (the accurac)classification was performed, was used as a test for the models.
+set, and the ratio to right and wrong (the accuracy) classification was performed, was used as a test for the models.
 
 Logistic regression and support vector classification models were trained on the training data sets. 
 

@@ -787,14 +787,14 @@ class ClassificationContainer:
 
         self.y = np.loadtxt(data, skiprows=1, usecols=(1,), dtype=np.int)
         # using gradient and ratio for the data
-        self.X = np.loadtxt(data, skiprows=1, usecols=(2,4,), dtype=np.float)
+        self.X = np.loadtxt(data, skiprows=1, usecols=(4,2,), dtype=np.float)
 
-        use_excel=0
+        use_excel=1
         if use_excel:
             excel_images = np.loadtxt(excel_data, skiprows=1, usecols=(0,), dtype=np.str)
             excel_manual = np.genfromtxt(excel_data, skip_header=1, usecols=(1,), dtype=np.float, missing_values = {0:"NaN"}, filling_values={0:np.nan})
-            
-            print(excel_manual)
+
+            # print(excel_manual)
             mask = excel_manual != np.nan
             
 
@@ -802,10 +802,12 @@ class ClassificationContainer:
             excel_ratios_v7 = np.loadtxt(excel_data, skiprows=1, usecols=(3,), dtype=np.float)
             excel_ratios_v8 = np.loadtxt(excel_data, skiprows=1, usecols=(4,), dtype=np.float)            
             excel_ratios_ct  = np.loadtxt(excel_data, skiprows=1, usecols=(5,), dtype=np.float)
-            excel_ratios_t  = np.loadtxt(excel_data, skiprows=1, usecols=(6,), dtype=np.float)                        
+            excel_ratios_ct_old  = np.loadtxt(excel_data, skiprows=1, usecols=(6,), dtype=np.float)
+            excel_ratios_ct_oldold  = np.loadtxt(excel_data, skiprows=1, usecols=(7,), dtype=np.float)
+            excel_ratios_t  = np.loadtxt(excel_data, skiprows=1, usecols=(8,), dtype=np.float)
 
-            classification_t = np.loadtxt(excel_data, skiprows=1, usecols=(9,), dtype=np.int)
-            classification_c = np.loadtxt(excel_data, skiprows=1, usecols=(10,), dtype=np.int)
+            classification_t = np.loadtxt(excel_data, skiprows=1, usecols=(11,), dtype=np.int)
+            classification_c = np.loadtxt(excel_data, skiprows=1, usecols=(12,), dtype=np.int)
 
             classification = np.zeros(classification_c.shape, dtype=np.int)
             # Now change the classification to the same type
@@ -821,7 +823,7 @@ class ClassificationContainer:
             classification[classification_c == 3] = 0
 
             classification[classification == 1] = 0
-            classification[classification == 2] = 0            
+            classification[classification == 2] = 1
             classification[classification == 3] = 1
 
 
@@ -843,7 +845,7 @@ class ClassificationContainer:
                 else:
                     delete.append(True)
 
-            # elf.X[:,0] = ratios
+            # self.X[:,0] = ratios
             delete = np.asarray(delete)
             self.new_X = np.zeros( (self.X.shape[0]-np.sum(delete==0), self.X.shape[1]  ) )
             self.new_y = np.zeros( (self.X.shape[0]-np.sum(delete==0),), dtype=np.int )
@@ -864,18 +866,30 @@ class ClassificationContainer:
             ax[0].scatter(excel_manual[mask], excel_ratios_v8[mask], label="man vs v8")
             ax[0].scatter(excel_manual[mask], excel_ratios_ct[mask], label="man vs ct")
             ax[0].scatter(excel_manual[mask], excel_ratios_t[mask], label="man vs t")                
-            ax[0].plot(np.linspace(0,3,20), np.linspace(0,2.5,20), 'k--',label="Perfect correlation")
+            ax[0].plot(np.linspace(0.5,2.5,20), np.linspace(0.5,2.5,20), 'k--',label="Perfect correlation")
             ax[0].scatter(excel_manual[mask], self.X[:,0][mask], label="manual vs python")
             ax[0].set_xlabel("manual")
             ax[0].set_ylabel("macro")
             ax[0].legend()
+
+
+            ax[1].scatter(excel_ratios_t, excel_ratios_ct, label="t vs ct")
+            ax[1].scatter(excel_ratios_ct, excel_ratios_ct_old, label="ct vs ct_old")
+            ax[1].scatter(excel_ratios_ct, excel_ratios_ct_oldold, label="ct vs ct_oldold")
+            ax[1].plot(np.linspace(0.75,1.35,20), np.linspace(0.75,1.35,20), 'k--',label="Perfect correlation")
+            ax[1].scatter(excel_ratios_t, self.X[:,0], label="t vs python")
+            ax[1].set_xlabel("manual")
+            ax[1].set_ylabel("macro")
+            ax[1].legend()
+
+
             fig.tight_layout()
             plt.show()
 
         self.X[:,1] = 0.
         #        print(self.X)
         # split into train test sets
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.3, random_state=42, stratify=self.y)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.3, random_state=4, stratify=self.y)
 
         self.scaler = preprocessing.StandardScaler().fit(self.X_train)
         self.X_train_transformed = self.scaler.transform(self.X_train)
@@ -958,6 +972,8 @@ if __name__ == '__main__':
 
     data = "MultisectionFit_2021-11-26--13-01-45.dat"
     data = "MultisectionFit_2021-11-26--14-48-59.dat"
+
+    data = "MultisectionFit_2021-11-28--17-31-50.dat"
     excel_data = 'excel_data.dat'
     
     print(f"Analysing images from {image_directory}, using data {data}\n >with excel data {excel_data}..")

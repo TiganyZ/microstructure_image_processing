@@ -4,6 +4,8 @@
 """
 
 import matplotlib.pyplot as plt
+from matplotlib.transforms import Affine2D
+from matplotlib.collections import PathCollection
 import imageio
 import numpy as np
 import re
@@ -50,8 +52,9 @@ class ChrisAlphaBetaFraction(ImageAnalysis):
             x2, y2 = coordinates[i+1,0], coordinates[i+1,1] + depth
 
             d = np.sqrt( (x1-x2)**2 + (y1-y2)**2 )
-            
-            line = measure.profile_line(image, (x1, y1), (x2, y2))
+
+            # Should be a row, column format. Therefore, we have y then x
+            line = measure.profile_line(image, (y1, x1), (y2, x2))
 
             segment_fraction[i] = line.sum() / d
 
@@ -64,15 +67,44 @@ class ChrisAlphaBetaFraction(ImageAnalysis):
         # Get the actual proportion of bakelite from the top, doing the same analysis as chris.
         thresholded_image = unprocessed_image > 0.5*np.max(unprocessed_image)
         boundary, mean, sigma = calculate_boundary(thresholded_image,
-                                                   sample_rate=40, offset = 0., n_sigma=2.)
+                                                   sample_rate=40, offset = 0., n_sigma=3., critical=True)
         self.lower_boundary = boundary 
         # boundary, mean, sigma = calculate_boundary(unprocessed_image>0.7, sample_rate = 40)
+
+        self.image = image
+        fixed_offset = 20
+        offset = mean + fixed_offset + 3*sigma # + 2*sigma # np.max(lower_boundary[:,1])
+
+        # Now find the difference in pixel heights between the images so we have true calibration
+        removed_pixel_rows = unprocessed_image.shape[0] - image.shape[0]
+
+        max_boundary = max(offset, removed_pixel_rows)
+
+        offset = int(max_boundary) - removed_pixel_rows
+        if offset < 0:
+            print("A/B fraction analysis: WARNING: offset is less than zero, setting to 0. ")
+            print("image.shape, unprocessed_image.shape, offset, mean, sigma, removed_pixel_rows, Y1, Y2")
+            print(image.shape, unprocessed_image.shape, offset, mean, sigma, removed_pixel_rows, Y1, Y2)
+
+            offset = 0
+
+        # n_samples = int((len(image) - int(offset))/float(sample_rate))
+
+
+        self.offset = offset
+
         self.surface_distances = []
         self.bulk_distances = []        
         Y1 = boundary[ 0,1]
         Y2 = boundary[-1,1]
         deltaY = Y2 - Y1
-        
+
+        Y1 = offset
+        Y2 = offset + deltaY
+        if Y2 < 0:
+            Y1 -= deltaY
+            Y2 -= deltaY
+
         self.data = ""
         
 
@@ -92,8 +124,11 @@ class ChrisAlphaBetaFraction(ImageAnalysis):
         idx=0
         while Z < surfdist:
             # Use the lower boundary to calculate
-            SUM[idx] = self.get_fraction_from_line_segment(image, Z, boundary) / 255.
-            self.surface_distances.append( np.mean(boundary[:,1]) + Z)
+            print(image.shape, Y1, Y1+Z, Y2, Y2+Z)
+            line = measure.profile_line(image, (Y1+Z,0), (Y2+Z, image.shape[1]-1)) # image[Z + Y3]
+            SUM[idx] = line.sum() / 255. / len(line)
+            #            SUM[idx] = self.get_fraction_from_line_segment(image, Z, boundary) / 255.
+            self.surface_distances.append( (Y1+Y2)/2 + Z)
             print("SUM ", SUM[idx])
             self.data += (str(SUM[idx]) + "\n")
             Z += surfpixels
@@ -110,9 +145,9 @@ class ChrisAlphaBetaFraction(ImageAnalysis):
         Z=0
         idx=0
         while Z < bulkdist:
-            line = measure.profile_line(image, (0,Y3-Z), (image.shape[1], Y3 + deltaY - Z )) # image[Z + Y3]
+            line = measure.profile_line(image, (Y3-Z,0), ( Y3 + deltaY - Z, image.shape[1]-1 )) # image[Z + Y3]
             self.bulk_distances.append(Y3-Z)
-            B_SUM[idx] = line.sum() / 255. / len(line)
+            B_SUM[idx] =  line.sum() / 255. / len(line)
             print("B_SUM ", B_SUM[idx])
             self.data += (str(B_SUM[idx]) + "\n")
             Z += bulkpixels
@@ -180,7 +215,7 @@ class AlphaBetaFraction(ImageAnalysis):
         self.name = "AlphaBetaFraction"
         self.comment = "#  pixel_depth  alphabetafraction   >  Analysis of alpha beta fraction"
         
-    def analyse(self, image, unprocessed_image,  sample_rate = 5, offset = 0):
+    def analyse(self, image, unprocessed_image,  sample_rate = 1, offset = 0):
         # Take in an an image file, which has been thresholded and has
         # the bakelite removed and then sample the alpha-beta volume
         # fraction
@@ -188,16 +223,24 @@ class AlphaBetaFraction(ImageAnalysis):
         # rescaled_image = exposure.rescale_intensity(unprocessed_image, in_range=(p2, p98))
         self.thresholded_image = unprocessed_image > 0.5*np.max(unprocessed_image)
         self.lower_boundary, self.mean, self.sigma = calculate_boundary(self.thresholded_image,
-                                                         sample_rate=10, offset = 0., n_sigma=1.)
+                                                                        sample_rate=10, offset = 0., n_sigma=1., critical=True)
 
         self.image = image
         fixed_offset = 20
+        Y1 = self.lower_boundary[0,1]
+        Y2 = self.lower_boundary[-1,1]
+        deltaY = Y2-Y1
+
         offset = self.mean + fixed_offset + 2*self.sigma # + 2*sigma # np.max(lower_boundary[:,1])
 
         # Now find the difference in pixel heights between the images so we have true calibration
         removed_pixel_rows = len(unprocessed_image) - len(image)
 
-        offset = int(offset) - removed_pixel_rows
+        max_boundary = max(offset, removed_pixel_rows)
+
+        offset = int(max_boundary) - removed_pixel_rows
+
+        # offset = int(offset) - removed_pixel_rows
         if offset < 0:
             print("A/B fraction analysis: WARNING: offset is less than zero, setting to 0. ")
             offset = 0
@@ -208,6 +251,7 @@ class AlphaBetaFraction(ImageAnalysis):
         self.offset = offset
         index = 0
 
+        straight = True
         datax = []
         datay = []
         for i, row in enumerate(image):
@@ -218,7 +262,20 @@ class AlphaBetaFraction(ImageAnalysis):
                     # alpha-beta volume fraction, where values closer
                     # to 1 are more alpha
                     datax.append( i )
-                    datay.append( np.mean(image[i-int(sample_rate/2)-1:i+1,:])/255. )
+                    if straight:
+                        #                        datay.append( np.mean(image[i-int(sample_rate/2)-1:i+1])/255. )
+                        datay.append( np.mean(image[i])/255. )
+                    else:
+                        if deltaY < 0:
+                            i1 = i - int(deltaY)
+                            i2 = i
+                        else:
+                            i1 = i
+                            i2 = i + int(deltaY)
+                        print(image.shape, i1, i2)
+
+                        line = measure.profile_line(image, (i1,0), ( i2, image.shape[1]-1 ))
+                        datay.append( line.sum() / 255. / len(line) )
                     index += 1
 
         self.data = np.zeros((index, 2))
@@ -269,7 +326,7 @@ class AlphaBetaFraction(ImageAnalysis):
                         
     def plot(self, original_image):
         
-        fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(12, 3))
+        fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(12, 4), sharey=True)
         ax[0].plot(self.lower_boundary[:,0], self.lower_boundary[:,1], 'r--', label = "Detected surface" )
         ax[0].hlines(self.mean + 3*self.sigma, 0, 1, transform=ax[0].get_yaxis_transform(), label = "Surf. μ + 0.5σ")
         ax[0].legend(bbox_to_anchor=(0.15, -0.4, 0.6, -0.4), loc='lower left',
@@ -302,12 +359,22 @@ class AlphaBetaFraction(ImageAnalysis):
             print("Straight line fit: WARNING: Cannot fit to straight line, will give flat dependence for line")
             y_fit = [0.5 for i in self.data[:,0]]
             label = f" {0:3.1g}*x + {0.5:3.1g} "
-        ax[2].scatter(self.data[:,0], self.data[:,1], label="data" )
-        ax[2].plot(self.data[:,0], y_fit, 'm-', label=label)
-        ax[2].set_xlabel("Surface Depth")
-        ax[2].set_ylabel("Alpha-beta fraction")        
+        ax[2].plot(self.data[:,1], self.data[:,0], label="data" )
+        ax[2].plot(y_fit, self.data[:,0], 'm-', label=label)
+        # ax[2].set_ylabel("Surface Depth")
+        ax[2].set_xlabel("Alpha-beta fraction")
         ax[2].set_title('α-β volume frac. vs depth')
+
+        # asp = np.diff(ax[2].get_xlim())[0] / np.diff(ax[2].get_ylim())[0]
+        # asp /= np.abs(np.diff(ax[1].get_xlim())[0] / np.diff(ax[1].get_ylim())[0])
+        # ax[2].set_aspect(asp)
+
+        # asp = np.diff(ax[2].get_xlim())[0] / np.diff(ax[2].get_ylim())[0]
+        # ax[2].set_aspect(asp)
         ax[2].legend()
+        ax[2].legend(bbox_to_anchor=(0.15, -0.4, 0.6, -0.4), loc='lower left',
+                     ncol=1, borderaxespad=0.)
+        plt.subplots_adjust(wspace=0, hspace=0)
         # ax[2].legend(bbox_to_anchor=(0.15, -0.4, 0.6, -0.4), loc='lower left',
         #              ncol=1, borderaxespad=0.)
         fig.tight_layout()
@@ -430,27 +497,21 @@ class AnalysisContainer:
 if __name__ == '__main__':
     # Test out the functionality
 
-    plot=0
+    plot=1 #1
     original_image_directory = "images"    
     image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation"
 
     image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold"
-
-    image_directory = "images_imageJ_analysed"
+    image_directory = "images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
+    #    image_directory = "images_imageJ_analysed"
     print(f"Analysing images from {image_directory}..")    
     # Now analyse
-    # print(f"> Alpha-beta fraction")    
-    # analysis = AlphaBetaFraction
-    # ac = AnalysisContainer(analysis, image_directory, original_image_directory)
-    # ac.analyse_images(plot=plot)
-    
-    print(f"> Chris Alpha-beta fraction")    
-    analysis = ChrisAlphaBetaFraction
+    print(f"> Alpha-beta fraction, profile")
+    analysis = AlphaBetaFraction
     ac = AnalysisContainer(analysis, image_directory, original_image_directory)
     ac.analyse_images(plot=plot)
 
-
-    
-    
-    
-        
+    # print(f"> Chris Alpha-beta fraction")
+    # analysis = ChrisAlphaBetaFraction
+    # ac = AnalysisContainer(analysis, image_directory, original_image_directory)
+    # ac.analyse_images(plot=plot)
