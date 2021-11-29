@@ -28,6 +28,9 @@ from skimage.filters import threshold_otsu, threshold_sauvola, threshold_niblack
 from skimage.segmentation import random_walker
 from skimage.morphology import reconstruction, disk, white_tophat
 
+from skimage.segmentation import watershed
+from skimage.feature import peak_local_max
+
 from scipy.fftpack import fftn, fftshift, fft2, ifft2
 
 from functools import partial
@@ -995,6 +998,86 @@ class RandomWalkerSegmentation(ProcessImage):
         plt.show()
 
 
+#######################
+###--- Watershed ---###
+#######################
+class Watershed(ProcessImage):
+    def __init__(self, args={}):
+        self.args = args
+        self.name = "Watershed"
+
+    def process(self, image):
+        # The range of the binary image spans over (-1, 1).
+        # We choose the hottest and the coldest pixels as markers.
+        # Now we want to separate the two objects in image
+        # Generate the markers as local maxima of the distance to the background
+
+        elevation_map = sobel(image)
+        
+        # self.distance = ndimage.distance_transform_edt(image)
+        # coords = peak_local_max(self.distance, footprint=np.ones((3, 3)), labels=image)
+        # mask = np.zeros(self.distance.shape, dtype=bool)
+        # mask[tuple(coords.T)] = True
+        # markers, _ = ndimage.label(mask)
+        p2, p98 = np.percentile(elevation_map, (2, 98))
+        elevation_map = exposure.rescale_intensity(elevation_map, in_range=(p2, p98))
+        markers = np.zeros_like(image)
+        markers[elevation_map < np.max(elevation_map)/4] = 1
+        markers[elevation_map > np.max(elevation_map)*3/4] = 2
+
+        # Equalization
+        
+        self.labels = watershed(elevation_map, markers, mask=image)
+
+
+        self.labels = ndimage.binary_fill_holes(self.labels - 1)
+        labeled_coins, _ = ndimage.label(self.labels)
+        self.image_label_overlay = color.label2rgb(labeled_coins, image=image, bg_label=0)
+        self.output = self.image_label_overlay
+        # Run random walker algorithm
+        # self.output = exposure.rescale_intensity(self.labels, in_range=(1, np.max(self.labels)),
+        #                                          out_range=(0, 1))
+
+    def plot(self, original_image):
+        # Plot results
+
+        fig, axes = plt.subplots(ncols=3, figsize=(9, 3), sharex=True, sharey=True)
+        ax = axes.ravel()
+
+        ax[0].set_title('Gradient')
+        ax[0].imshow(self.image, cmap=plt.cm.gray)
+
+        ax[1].set_title('Image analysed')
+        ax[1].imshow(original_image, cmap=plt.cm.gray)
+        ax[1].contour(self.labels, [0.5], linewidths=1.2, colors='y')
+
+
+
+        ax[2].imshow(self.image_label_overlay, cmap=plt.cm.nipy_spectral)
+        ax[2].set_title('Separated objects')
+
+        # for a in ax:
+        #     a.set_axis_off()
+
+
+        
+        # fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(8, 3.2),
+        #                                     sharex=True, sharey=True)
+        # ax1.imshow(original_image, cmap='gray')
+        # ax1.axis('off')
+        # ax1.set_title('Noisy data')
+        # ax2.imshow(self.markers/2.0, cmap='magma')
+        # ax2.axis('off')
+        # ax2.set_title('Markers')
+        # ax3.imshow(self.output, cmap='gray')
+        # ax3.axis('off')
+        # ax3.set_title('Segmentation')
+
+        fig.tight_layout()
+        plt.show()
+
+
+
 
 ######################################
 ###---   Erosion segmentation   ---###
@@ -1098,8 +1181,10 @@ if __name__ == '__main__':
 
     processes = [ GammaLogContrast, OtsuThreshold ]
 
-    processes = [ RandomWalkerSegmentation]
 
+
+    image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold"
+    processes = [ Watershed ]
     #    processes = [ ErosionSegmentation ]
 
     arguments = [{} for process in processes ] 

@@ -67,13 +67,13 @@ class ChrisAlphaBetaFraction(ImageAnalysis):
         # Get the actual proportion of bakelite from the top, doing the same analysis as chris.
         thresholded_image = unprocessed_image > 0.5*np.max(unprocessed_image)
         boundary, mean, sigma = calculate_boundary(thresholded_image,
-                                                   sample_rate=40, offset = 0., n_sigma=3., critical=True)
+                                                   sample_rate=40, offset = 0., n_sigma=0.5)
         self.lower_boundary = boundary 
         # boundary, mean, sigma = calculate_boundary(unprocessed_image>0.7, sample_rate = 40)
 
         self.image = image
         fixed_offset = 20
-        offset = mean + fixed_offset + 3*sigma # + 2*sigma # np.max(lower_boundary[:,1])
+        offset = mean + fixed_offset + 0.5*sigma # + 2*sigma # np.max(lower_boundary[:,1])
 
         # Now find the difference in pixel heights between the images so we have true calibration
         removed_pixel_rows = unprocessed_image.shape[0] - image.shape[0]
@@ -214,7 +214,31 @@ class AlphaBetaFraction(ImageAnalysis):
     def __init__(self):
         self.name = "AlphaBetaFraction"
         self.comment = "#  pixel_depth  alphabetafraction   >  Analysis of alpha beta fraction"
+
+    def get_fraction_from_line_segment(self, image, depth, coordinates):
+
+        n_segments = len(coordinates)-1
+        segment_fraction = np.zeros(n_segments)
+
+        coordinates[:,1] -= np.mean(coordinates[:,1])
         
+        d = 0
+        
+        for i, coord in enumerate(coordinates):
+            if i+1 == n_segments:
+                break
+            x1, y1 = coordinates[i  ,0], np.int( coordinates[i  ,1] + depth) 
+            x2, y2 = coordinates[i+1,0], np.int( coordinates[i+1,1] + depth) 
+
+            d = np.sqrt( (x1-x2)**2 + (y1-y2)**2 )
+
+            # Should be a row, column format. Therefore, we have y then x
+            line = measure.profile_line(image, (y1, x1), (y2, x2))
+
+            segment_fraction[i] = line.sum() / d
+
+        return np.mean(segment_fraction)
+            
     def analyse(self, image, unprocessed_image,  sample_rate = 1, offset = 0):
         # Take in an an image file, which has been thresholded and has
         # the bakelite removed and then sample the alpha-beta volume
@@ -223,15 +247,16 @@ class AlphaBetaFraction(ImageAnalysis):
         # rescaled_image = exposure.rescale_intensity(unprocessed_image, in_range=(p2, p98))
         self.thresholded_image = unprocessed_image > 0.5*np.max(unprocessed_image)
         self.lower_boundary, self.mean, self.sigma = calculate_boundary(self.thresholded_image,
-                                                                        sample_rate=10, offset = 0., n_sigma=1., critical=True)
-
+                                                                        sample_rate=10, offset = 5, n_sigma=0)
+        image = util.invert(image)
         self.image = image
-        fixed_offset = 20
         Y1 = self.lower_boundary[0,1]
         Y2 = self.lower_boundary[-1,1]
         deltaY = Y2-Y1
 
-        offset = self.mean + fixed_offset + 2*self.sigma # + 2*sigma # np.max(lower_boundary[:,1])
+        self.n_sigma = 0
+        offset = np.max(self.lower_boundary[:,1]) 
+        # offset = self.mean #+ fixed_offset + 0.5*self.sigma # + 2*sigma # np.max(lower_boundary[:,1])
 
         # Now find the difference in pixel heights between the images so we have true calibration
         removed_pixel_rows = len(unprocessed_image) - len(image)
@@ -250,21 +275,28 @@ class AlphaBetaFraction(ImageAnalysis):
         
         self.offset = offset
         index = 0
-
         straight = True
+        follow_boundary = not straight
+
         datax = []
         datay = []
         for i, row in enumerate(image):
             if i > offset:
                 ni = i - int(offset) 
                 if ni % sample_rate == 0:
-                    # Get a row of pixels and find the mean for the
+                    if index > 20:
+                        straight = True
+                        follow_boundary = not straight
+
+
                     # alpha-beta volume fraction, where values closer
                     # to 1 are more alpha
                     datax.append( i )
                     if straight:
                         #                        datay.append( np.mean(image[i-int(sample_rate/2)-1:i+1])/255. )
                         datay.append( np.mean(image[i])/255. )
+                    elif follow_boundary:
+                        datay.append( self.get_fraction_from_line_segment(image, ni, self.lower_boundary) / 255. )
                     else:
                         if deltaY < 0:
                             i1 = i - int(deltaY)
@@ -327,18 +359,18 @@ class AlphaBetaFraction(ImageAnalysis):
     def plot(self, original_image):
         
         fig, ax = plt.subplots(nrows=1, ncols=3, figsize=(12, 4), sharey=True)
-        ax[0].plot(self.lower_boundary[:,0], self.lower_boundary[:,1], 'r--', label = "Detected surface" )
-        ax[0].hlines(self.mean + 3*self.sigma, 0, 1, transform=ax[0].get_yaxis_transform(), label = "Surf. μ + 0.5σ")
+        ax[0].plot(self.lower_boundary[:,0], self.lower_boundary[:,1], 'r', linestyle='dashed', linewidth=2, label = "Detected surface" )
+        ax[0].hlines(self.offset, 0, 1, transform=ax[0].get_yaxis_transform(), linewidth=3,  label = f"Surf. μ + {self.n_sigma}σ")
         ax[0].legend(bbox_to_anchor=(0.15, -0.4, 0.6, -0.4), loc='lower left',
                       ncol=1, borderaxespad=0.)
         # ax[1].imshow(self.thresholded_image, cmap='gray')
         # ax[1].set_title('Thresholded image')
-
         
-        ax[1].imshow(self.image, cmap='gray')
+        ax[1].imshow(util.invert(self.image), cmap='gray')
+        ax[1].plot(self.lower_boundary[:,0], self.lower_boundary[:,1], 'r', linestyle='dashed', linewidth=2, label = "Detected surface" )
         ax[1].set_title('Processed image')
-        ax[1].hlines(self.offset, 0, 1, transform=ax[1].get_yaxis_transform(), label = "Surf. μ + 0.5σ")
-        ax[1].legend(bbox_to_anchor=(0.15, -0.4, 0.6, -0.4), loc='lower left',
+        ax[1].hlines(self.offset, 0, 1, transform=ax[1].get_yaxis_transform(), linewidth=3,  label = f"Surf. μ + {self.n_sigma}σ")
+        ax[1].legend(bbox_to_anchor=(0.25, -0.4, 0.7, -0.4), loc='lower left',
                      ncol=1, borderaxespad=0.)
 
         
@@ -497,12 +529,15 @@ class AnalysisContainer:
 if __name__ == '__main__':
     # Test out the functionality
 
-    plot=1 #1
+    plot=0 #1
     original_image_directory = "images"    
     image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation"
 
     image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold"
     image_directory = "images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
+
+    image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation"
+    image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold"
     #    image_directory = "images_imageJ_analysed"
     print(f"Analysing images from {image_directory}..")    
     # Now analyse

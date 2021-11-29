@@ -347,6 +347,8 @@ import matplotlib.cm as cm
 
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
+
+from preprocess_data import LinearFit
 # Make an abstract base class which supplies a processing function upon an image
 class DataTrainer(ABC):
     
@@ -498,11 +500,14 @@ class TrainSVM(DataTrainer):
         ax[0].set_xlabel("Surface-to-bulk ratio")
         ax[0].set_ylabel("Classification space")            
         ax[0].legend()
+        ax[0].legend(loc='upper right',
+                     ncol=1, borderaxespad=0.)
+        
         leg = ax[0].get_legend()
-        leg.legendHandles[0].set_color('red')
-        leg.legendHandles[1].set_color('blue')        
-        leg.legendHandles[2].set_color('yellow')
-        leg.legendHandles[3].set_color('purple')        
+        # leg.legendHandles[0].set_color('red')
+        # leg.legendHandles[1].set_color('blue')        
+        # leg.legendHandles[2].set_color('yellow')
+        # leg.legendHandles[3].set_color('purple')        
         xlim = ax[0].get_xlim()
         ylim = ax[0].get_ylim()
 
@@ -542,11 +547,18 @@ class TrainSVM(DataTrainer):
         #     facecolors="none",
         #     edgecolors="k",
         # )
-
-        ax[1].plot(X_original[:,0], probs[:,0], 'bo', label="Testing data")#
+        ordered = np.argsort(X_original[:,0])
+        ax[1].plot(X_original[:,0][ordered], probs[:,1][ordered], label="Denudation risk")#
+        ax[1].plot(X_original[:,0][ordered], probs[:,0][ordered], alpha=0.5, label="Normal risk")#
         ax[1].set_title(f'SVM predicted probability')
         ax[1].set_ylabel("Risk")
-        ax[1].set_xlabel("Surface-to-bulk ratio")        
+        ax[1].set_xlabel("Surface-to-bulk ratio")
+        ax[1].legend()
+
+        # ax[1].plot(X_original[:,0], probs[:,0], 'bo', label="Testing data")#
+        # ax[1].set_title(f'SVM predicted probability')
+        # ax[1].set_ylabel("Risk")
+        # ax[1].set_xlabel("Surface-to-bulk ratio")        
 
         # ax[2].plot(X_original[:,1], probs[:,1], 'ro')        
         # ax[2].set_title(f'SVC predicted probability')
@@ -620,10 +632,10 @@ class TrainLogisticRegression(DataTrainer):
         ax[0].set_ylabel("Classification space")            
         ax[0].legend()
         leg = ax[0].get_legend()
-        leg.legendHandles[0].set_color('red')
-        leg.legendHandles[1].set_color('blue')        
-        leg.legendHandles[2].set_color('yellow')
-        leg.legendHandles[3].set_color('purple')        
+        # leg.legendHandles[0].set_color('red')
+        # leg.legendHandles[1].set_color('blue')        
+        # leg.legendHandles[2].set_color('yellow')
+        # leg.legendHandles[3].set_color('purple')        
         xlim = ax[0].get_xlim()
         ylim = ax[0].get_ylim()
 
@@ -634,10 +646,17 @@ class TrainLogisticRegression(DataTrainer):
         # ymin = min(np.min(y_train), np.min(y))        
 
         xx = np.linspace(xlim[0], xlim[1], 30)
+        yy = np.linspace(ylim[0], ylim[1], 30)
+
         scaler = preprocessing.StandardScaler().fit(xx.reshape(xx.shape + (1,)))
         xxt = scaler.transform(xx.reshape(xx.shape + (1,)))[:,0]
-        yy = np.linspace(ylim[0], ylim[1], 30)
-        YY, XX = np.meshgrid(yy, xxt)
+
+        scaler = preprocessing.StandardScaler().fit(yy.reshape(yy.shape + (1,)))
+        yyt = scaler.transform(yy.reshape(yy.shape + (1,)))[:,0]
+        
+        
+        # yyt = np.linspace(ylim[0], ylim[1], 30)
+        YY, XX = np.meshgrid(yyt, xxt)
         xy = np.vstack([XX.ravel(), YY.ravel()]).T
         Z = self.model.decision_function(xy).reshape(XX.shape)
 
@@ -664,10 +683,18 @@ class TrainLogisticRegression(DataTrainer):
         #     edgecolors="k",
         # )
 
-        ax[1].plot(X_original[:,0], probs[:,0], 'bo', label="Testing data")#
+        ordered = np.argsort(X_original[:,0])
+        # ax[1].plot(X_original[:,0][ordered], probs[:,0][ordered], label="")#
+        ax[1].plot(X_original[:,0][ordered], probs[:,1][ordered], label="Denudation risk")#
+        ax[1].plot(X_original[:,0][ordered], probs[:,0][ordered], alpha=0.5, label="Normal risk")#
+
+        ax[1].plot(X_original[:,0][ordered], probs[:,1][ordered], label="Denudation risk")#
+        ax[1].plot(X_original[:,0][ordered], probs[:,0][ordered], alpha=0.5, label="Normal risk")#
+
         ax[1].set_title(f'LogReg predicted probability')
         ax[1].set_ylabel("Risk")
-        ax[1].set_xlabel("Surface-to-bulk ratio")        
+        ax[1].set_xlabel("Surface-to-bulk ratio")
+        ax[1].legend()
 
         # ax[2].plot(X_original[:,1], probs[:,1], 'ro')        
         # ax[2].set_title(f'SVC predicted probability')
@@ -787,27 +814,30 @@ class ClassificationContainer:
 
         self.y = np.loadtxt(data, skiprows=1, usecols=(1,), dtype=np.int)
         # using gradient and ratio for the data
-        self.X = np.loadtxt(data, skiprows=1, usecols=(4,2,), dtype=np.float)
+        self.X = np.loadtxt(data, skiprows=1, usecols=(2,4,), dtype=np.float)
 
         use_excel=1
         if use_excel:
             excel_images = np.loadtxt(excel_data, skiprows=1, usecols=(0,), dtype=np.str)
-            excel_manual = np.genfromtxt(excel_data, skip_header=1, usecols=(1,), dtype=np.float, missing_values = {0:"NaN"}, filling_values={0:np.nan})
+            excel_manual = np.genfromtxt(excel_data, skip_header=1, usecols=(1,), dtype=np.float, missing_values = "NaN", filling_values=np.nan)
 
             # print(excel_manual)
             mask = excel_manual != np.nan
+            man = np.asarray( excel_manual[mask], dtype=np.float )
             
 
             excel_ratios_v6 = np.loadtxt(excel_data, skiprows=1, usecols=(2,), dtype=np.float)
             excel_ratios_v7 = np.loadtxt(excel_data, skiprows=1, usecols=(3,), dtype=np.float)
-            excel_ratios_v8 = np.loadtxt(excel_data, skiprows=1, usecols=(4,), dtype=np.float)            
-            excel_ratios_ct  = np.loadtxt(excel_data, skiprows=1, usecols=(5,), dtype=np.float)
-            excel_ratios_ct_old  = np.loadtxt(excel_data, skiprows=1, usecols=(6,), dtype=np.float)
-            excel_ratios_ct_oldold  = np.loadtxt(excel_data, skiprows=1, usecols=(7,), dtype=np.float)
-            excel_ratios_t  = np.loadtxt(excel_data, skiprows=1, usecols=(8,), dtype=np.float)
+            excel_ratios_v8_3 = np.loadtxt(excel_data, skiprows=1, usecols=(4,), dtype=np.float)
+            excel_ratios_v8_0  = np.loadtxt(excel_data, skiprows=1, usecols=(5,), dtype=np.float)
+            excel_ratios_ct  = np.loadtxt(excel_data, skiprows=1, usecols=(6,), dtype=np.float)
+            excel_ratios_cto  = np.loadtxt(excel_data, skiprows=1, usecols=(7,), dtype=np.float)            
+            excel_ratios_ct_old  = np.loadtxt(excel_data, skiprows=1, usecols=(8,), dtype=np.float)
+            excel_ratios_ct_oldold  = np.loadtxt(excel_data, skiprows=1, usecols=(9,), dtype=np.float)
+            excel_ratios_t  = np.loadtxt(excel_data, skiprows=1, usecols=(10,), dtype=np.float)
 
-            classification_t = np.loadtxt(excel_data, skiprows=1, usecols=(11,), dtype=np.int)
-            classification_c = np.loadtxt(excel_data, skiprows=1, usecols=(12,), dtype=np.int)
+            classification_t = np.loadtxt(excel_data, skiprows=1, usecols=(13,), dtype=np.int)
+            classification_c = np.loadtxt(excel_data, skiprows=1, usecols=(14,), dtype=np.int)
 
             classification = np.zeros(classification_c.shape, dtype=np.int)
             # Now change the classification to the same type
@@ -817,19 +847,19 @@ class ClassificationContainer:
             #    2 – Diffuse Beta Denudation
             #    3 – Micro ok
 
-            classification[classification_c == 0] = 3                        
-            classification[classification_c == 1] = 2            
+            classification[classification_c == 0] = 1                        
+            classification[classification_c == 1] = 1            
             classification[classification_c == 2] = 1
             classification[classification_c == 3] = 0
 
-            classification[classification == 1] = 0
-            classification[classification == 2] = 1
-            classification[classification == 3] = 1
+            # classification[classification == 1] = 0
+            # classification[classification == 2] = 0
+            # classification[classification == 3] = 1
 
 
             ratios = np.zeros((self.X.shape[0]))
             for i_ind, ii in enumerate(self.images):
-                for ind, (ei, er, c) in enumerate(zip(excel_images, excel_ratios_v8, classification)):
+                for ind, (ei, er, c) in enumerate(zip(excel_images, excel_ratios_v8_3, classification)):
                     if ii.startswith(ei):
                         print(ii, ei, er, c)
                         ratios[i_ind] = er
@@ -845,7 +875,7 @@ class ClassificationContainer:
                 else:
                     delete.append(True)
 
-            # self.X[:,0] = ratios
+            self.X[:,0] = ratios
             delete = np.asarray(delete)
             self.new_X = np.zeros( (self.X.shape[0]-np.sum(delete==0), self.X.shape[1]  ) )
             self.new_y = np.zeros( (self.X.shape[0]-np.sum(delete==0),), dtype=np.int )
@@ -858,38 +888,72 @@ class ClassificationContainer:
             self.X = self.new_X
             self.y = self.new_y
 
-   
-            fig, ax = plt.subplots(ncols=2, figsize=(12, 5))
 
-            #ax[0].scatter(excel_manual[mask], excel_ratios_v6[mask], label="man vs v6")
-            #ax[0].scatter(excel_manual[mask], excel_ratios_v7[mask], label="man vs v7")
-            ax[0].scatter(excel_manual[mask], excel_ratios_v8[mask], label="man vs v8")
-            ax[0].scatter(excel_manual[mask], excel_ratios_ct[mask], label="man vs ct")
-            ax[0].scatter(excel_manual[mask], excel_ratios_t[mask], label="man vs t")                
-            ax[0].plot(np.linspace(0.5,2.5,20), np.linspace(0.5,2.5,20), 'k--',label="Perfect correlation")
-            ax[0].scatter(excel_manual[mask], self.X[:,0][mask], label="manual vs python")
-            ax[0].set_xlabel("manual")
-            ax[0].set_ylabel("macro")
-            ax[0].legend()
+            # Fit the lines
+            # fit = LinearFit()
+            # self.params_v8, self.stdevs_v8 = fit.fit(**fit.straight(excel_ratios_v8_3[mask]))
+            # self.params_py, self.stdevs_py = fit.fit(**fit.straight(self.X[:,0][mask]))
+
+            # yv8  = fit.straight_line(excel_manual[mask], self.params_v8[0], self.params_v8[1])
+            # yv81 = fit.straight_line(excel_manual[mask], self.params_v8[0] + self.stdevs_v8[0], self.params_v8[1] - self.stdevs_v8[1])
+            # yv82 = fit.straight_line(excel_manual[mask], self.params_v8[0] - self.stdevs_v8[0], self.params_v8[1] + self.stdevs_v8[1])
+
+            # ypy  = fit.straight_line(excel_manual[mask], self.params_py[0], self.params_py[1])
+            # ypy1 = fit.straight_line(excel_manual[mask], self.params_py[0] + self.stdevs_py[0], self.params_py[1] - self.stdevs_py[1])
+            # ypy2 = fit.straight_line(excel_manual[mask], self.params_py[0] - self.stdevs_py[0], self.params_py[1] + self.stdevs_py[1])
+            
+            fig, ax = plt.subplots(ncols=1, figsize=(6, 4))
+
+            #ax.scatter(excel_manual[mask], excel_ratios_v6[mask], label="man vs v6")
+            #ax.scatter(excel_manual[mask], excel_ratios_v7[mask], label="man vs v7")
+            ax.scatter(excel_manual[mask], excel_ratios_v8_3[mask], alpha=0.4, label="Manual vs macro v8 3 sig")
+            ax.scatter(excel_manual[mask], excel_ratios_v8_0[mask], alpha=0.4, label="Manual vs macro v8 0 sig")            
+            ax.scatter(excel_manual[mask], self.X[:,0][mask],       alpha=0.4, label="Manual vs python")
+            # ax.set_xlim(0, 0.5)
+            # ax.set_ylim(0, 0.5)            
 
 
-            ax[1].scatter(excel_ratios_t, excel_ratios_ct, label="t vs ct")
-            ax[1].scatter(excel_ratios_ct, excel_ratios_ct_old, label="ct vs ct_old")
-            ax[1].scatter(excel_ratios_ct, excel_ratios_ct_oldold, label="ct vs ct_oldold")
-            ax[1].plot(np.linspace(0.75,1.35,20), np.linspace(0.75,1.35,20), 'k--',label="Perfect correlation")
-            ax[1].scatter(excel_ratios_t, self.X[:,0], label="t vs python")
-            ax[1].set_xlabel("manual")
-            ax[1].set_ylabel("macro")
-            ax[1].legend()
+            # ax.plot(excel_manual[mask], yb, 'r-', label="v8 fit")
+            # ax.plot(excel_manual[mask], yb1, 'g--')
+            # ax.plot(excel_manual[mask], yb2, 'g--')
+            # ax.fill_between(excel_manual[mask], yb1, yb2, facecolor="gray", alpha=0.15)
+
+
+            
+            # ax.scatter(excel_manual[mask], excel_ratios_ct[mask], label="man vs ct")
+            # ax.scatter(excel_manual[mask], excel_ratios_t[mask], label="man vs t")                
+            ax.plot(np.linspace(0.5,2.5,20), np.linspace(0.5,2.5,20), 'k--',label="Perfect correlation")
+            
+            ax.set_xlabel("manual")
+            ax.set_ylabel("macro")
+            ax.legend()
+
+
+            # ax[1].scatter(excel_ratios_t, excel_ratios_ct, label="t vs ct")
+            # ax[1].scatter(excel_ratios_ct, excel_ratios_ct_old, label="ct vs ct_old")
+            # ax[1].scatter(excel_ratios_ct, excel_ratios_ct_oldold, label="ct vs ct_oldold")
+            # ax[1].plot(np.linspace(0.75,1.35,20), np.linspace(0.75,1.35,20), 'k--',label="Perfect correlation")
+            # ax[1].scatter(excel_ratios_t, self.X[:,0], label="t vs python")
+            # ax[1].set_xlabel("manual")
+            # ax[1].set_ylabel("macro")
+            # ax[1].legend()
 
 
             fig.tight_layout()
             plt.show()
 
         self.X[:,1] = 0.
-        #        print(self.X)
+
+        # self.X = np.reshape( self.X[mask], (np.sum(mask),2))
+        # self.X = np.zeros((np.sum(mask), 2))
+        # self.X[:,0] = excel_manual[mask]
+        # self.y = self.y[mask]
+
+        for i, x in enumerate(self.X):
+            print(self.X[i], self.y[i], mask[i])
+        
         # split into train test sets
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.3, random_state=4, stratify=self.y)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.3, random_state=2, stratify=self.y)
 
         self.scaler = preprocessing.StandardScaler().fit(self.X_train)
         self.X_train_transformed = self.scaler.transform(self.X_train)
@@ -907,7 +971,6 @@ class ClassificationContainer:
             trainer = method()
             model = trainer.train(self.X_train_transformed, self.y_train)
 
-            # Now test the model on the test dataset
 
             yhat = model.predict(self.X_test_transformed)
             # evaluate the model
@@ -974,6 +1037,9 @@ if __name__ == '__main__':
     data = "MultisectionFit_2021-11-26--14-48-59.dat"
 
     data = "MultisectionFit_2021-11-28--17-31-50.dat"
+    data = "MultisectionFit_2021-11-29--10-43-55.dat"
+    data = "MultisectionFit_2021-11-29--11-57-06.dat"
+    data = "MultisectionFit_2021-11-29--15-03-05.dat"
     excel_data = 'excel_data.dat'
     
     print(f"Analysing images from {image_directory}, using data {data}\n >with excel data {excel_data}..")
