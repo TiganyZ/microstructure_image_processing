@@ -105,9 +105,9 @@ measure was to define a surface depth after which alpha-beta volume
 fraction data is considered to be bulk. A ratio of the average volume
 fractions before and after this threshold were calculated.
 
-However, analysing this data, one cannot see a clear correlation
-between this ratio and beta denudation. This is likely due to the
-large amount of noise in the alpha-beta volume fraction data.
+# However, analysing this data, one cannot see a clear correlation
+# between this ratio and beta denudation. This is likely due to the
+# large amount of noise in the alpha-beta volume fraction data.
 
 A better predictor can be created by analysing the decrease in alpha
 volume fraction from the surface. To measure this in a standardised
@@ -183,6 +183,25 @@ Surface to bulk ratios from ImageJ
 |------------------------+----------------|
 | Logistic Regression    |          85.5% |
 | Support Vector Machine |          84.2% |
+
+
+
+| Method (combined)      | Accuracy Score |
+|------------------------+----------------|
+| Logistic Regression    |          89.3% |
+| Support Vector Machine |          88.0% |
+
+
+| Method (Surface-to-bulk ratio) | Accuracy Score |
+|--------------------------------+----------------|
+| Logistic Regression            |          89.3% |
+| Support Vector Machine         |          88.0% |
+
+
+|                        | Automated Analysis | Image Macro Script (v8) | Manual (Limited data, slow!) |
+|------------------------+--------------------+-------------------------+------------------------------|
+| Logistic Regression    |              89.3% |                   88.0% |                        96.9% |
+| Support Vector Machine |              88.0% |                   88.0% |                        96.9% |
 
 
 [[file:2021-11-02_images/figures/logreg_classification_ratiov7_chrisclass.png]]

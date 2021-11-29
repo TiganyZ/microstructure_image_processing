@@ -2,7 +2,7 @@
 #+TITLE: Automatic detection of beta-denudated Ti-64 using machine learning
 #
 #+Author: Tigany Zarrouk
-#+Date: 25.11.2021
+#+Date: 01.12.2021
 #+Email: tigany.zarrouk@kcl.ac.uk
 
 #+REVEAL_ROOT: file:///home/tigany/.emacs.d/elpa/emacs-reveal/emacs-reveal-submodules/reveal.js
@@ -22,34 +22,39 @@
 #+OPTIONS: num:nil toc:nil reveal_slide_number:h/v
 #+REVEAL_EXTRA_JS: { src: 'vid.js', async: true, condition: function() { return !!document.body.classList; } }
 #+REVEAL_EXTERNAL_PLUGINS:({src: "%splugins/chart.js"}”)
-#+REVEAL_EXTRA_CSS: ./extra.css
+#+REVEAL_EXTRA_CSS: ./extra_lt.css
 
 #+REVEAL_TITLE_SLIDE: title-slide_sasha.html
 
 * Introduction
+  #+REVEAL_HTML: <div class="column" style="float:left; width: 50%">
   - Beta denudation, reduction of the beta phase, seen in some surface
     samples of Ti-64.
-  - This microstructural degredation increases potential for failure.
-  - Detection usually a manual process, involving measurement by hand,
-    with human judgement, one-by-one.
-  - Automation of detection will provide a quick and useful "second
+  - This microstructural degradation increases potential for failure.
+  - Detection usually a manual process, involving measurement by hand or macro.
+  - Automation will provide a quick and useful "second
     opinion" to guide judgement of whether a sample is beta
-    denudated.
-* Motivation
+    denudated or not, taking into account historical data.
+  #+REVEAL_HTML: </div>
+  #+REVEAL_HTML: <div class="column" style="float:right; width: 50%">
+    [[file:images/I262562.jpg]]
+  #+REVEAL_HTML: </div>
 * Method
-  - Process optical image to enhance the alpha-beta microstructure.
-  - Extract the alpha-beta volume fraction from image.
-  - Analyse volume fraction data to give a predictor variable
-  - Feed the predictor variable into the machine learning model which
-    will give a "yes/no" answer as to whether the sample is denudated,
-    with a probability.
-  - Repeat for all images.
-
+  #+REVEAL_HTML: <div class="column" style="float:left; width: 100%">
+  - _Process_ image to enhance microstructure.
+  - _Extract_ the volume fraction data.
+  - _Train_ model with data.
+  - _Test_ accuracy against manual and macro methods.
+  #+REVEAL_HTML: </div>
+  # #+REVEAL_HTML: <div class="column" style="float:right; width: 50%">
+  #   [[file:images/I262562.jpg]]
+  # #+REVEAL_HTML: </div>
 ** Technical details
+   - Data set is 251 images, which were classified by myself and Chris
+     Collins.
+   - Data partitioned into a training and a test set.
    - Train a machine learning model (support vector machine/logistic
-     regression) on a training set of data.
-   - Training set is 200 images, which were classified by myself and
-     Chris Collins.
+     regression) on the training set of data.
    - Test set of data used to test the predictions of the model on
      unseen data.
    - Accuracy score gives our confidence in the machine learning
@@ -59,18 +64,18 @@
 
 
 #+NAME: TBE band structure
-#+REVEAL_HTML: <div class="column" style="float:left; width: 48%">
-#+ATTR_HTML: :width 80% ;
+#+REVEAL_HTML: <div class="column" style="float:left; width: 50%">
+#+ATTR_HTML: :width 75% ;
 [[file:figures/I062438.jpg]]
-#+ATTR_HTML: :width 80% ;
+#+ATTR_HTML: :width 75% ;
 [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg]]
 #+REVEAL_HTML: </div>
 
 #+ATTR_REVEAL: :frag fade-in
-#+REVEAL_HTML: <div class="column" style="float:right; width: 48%">
-#+ATTR_HTML: :width 80% ;
+#+REVEAL_HTML: <div class="column" style="float:right; width: 50%">
+#+ATTR_HTML: :width 75% ;
 [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg]]
-#+ATTR_HTML: :width 80% ;
+#+ATTR_HTML: :width 75% ;
 [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold.jpg]]
 #+REVEAL_HTML: </div>
 
@@ -78,7 +83,8 @@
 ** Comparing to macro
 
 #+REVEAL_HTML: <div class="column" style="float:left; width: 48%">
-[[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation.jpg]]
+[[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold.jpg]]
+# [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_RandomWalkerSegmentation.jpg]]
 #+REVEAL_HTML: </div>
 #+REVEAL_HTML: <div class="column" style="float:right; width: 48%">
 [[file:figures/I062438.jpg_analysed.jpg]]
@@ -86,12 +92,50 @@
 
 * Extraction of Volume fraction
 
-  [[file:figures/analyse_data_surface_detection_and_data_extraction.png]]
+  [[file:figures/analyse_data_surface_detection_and_data_extraction_heavily_denudated.png]]
+  [[file:figures/analyse_data_surface_detection_and_data_extraction_imageJ_chrisanalysis_first_sideways.png]]
+  [[file:figures/analyse_data_surface_detection_and_data_extraction_I038897_heavily_denudated.png]]
 
-  [[file:figures/analyse_data_surface_detection_and_data_extraction_denudated.png]]
 
-* Analysis of Volume fraction
 
-  [[file:figures/preprocess_data_gradient_extraction_denudated.png]]
+* Prediction
+** Data
+   #+ATTR_HTML: :width 50% ;
+   [[file:figures/logreg_classifier.png]]
+   #+ATTR_HTML: :width 50% ;
+   [[file:figures/svm_classifier.png]]
 
-* Classification
+  #+REVEAL: split
+
+  #+REVEAL_HTML: <div class="column" style="float:left; width: 48%">
+  Automated
+  [[file:figures/logreg_risk_surfacetobulk.png]]
+
+  Macro
+  [[file:figures/logreg_v7_surface_to_bulk.png]]
+  #  [[file:figures/logreg_macro_surface_to_bulk.png]]
+  #+REVEAL_HTML: </div>
+
+  #+REVEAL_HTML: <div class="column" style="float:right; width: 48%">
+  Manual
+  [[file:figures/logreg_manual_surface_to_bulk.png]]
+  #+REVEAL_HTML: </div>
+
+
+  # [[file:figures/analyse_data_surface_detection_and_data_extraction.png]]
+
+  # [[file:figures/analyse_data_surface_detection_and_data_extraction_denudated.png]]
+
+* Accuracy
+
+| Method                 | Automated | ImageJ Macro | Manual (Less data) |
+|------------------------+-----------+--------------+--------------------|
+| Logistic Regression    |     89.3% |        88.0% |              96.9% |
+| Support Vector Machine |     88.0% |        88.0% |              96.9% |
+
+* Conclusion
+  - Efficiencies introduced in detection of beta denudation.
+    - Can analyse a batch of images together
+    - Trained model gives results in seconds, for each image.
+  - Optimised image processing
+  - Model is easily extensible (just feed more data)

@@ -1012,21 +1012,36 @@ class Watershed(ProcessImage):
         # Now we want to separate the two objects in image
         # Generate the markers as local maxima of the distance to the background
 
-        elevation_map = sobel(image)
-        
+        elevation_map = sobel(util.invert(image))
+        self.image = image
         # self.distance = ndimage.distance_transform_edt(image)
         # coords = peak_local_max(self.distance, footprint=np.ones((3, 3)), labels=image)
         # mask = np.zeros(self.distance.shape, dtype=bool)
         # mask[tuple(coords.T)] = True
         # markers, _ = ndimage.label(mask)
-        p2, p98 = np.percentile(elevation_map, (2, 98))
-        elevation_map = exposure.rescale_intensity(elevation_map, in_range=(p2, p98))
-        markers = np.zeros_like(image)
-        markers[elevation_map < np.max(elevation_map)/4] = 1
-        markers[elevation_map > np.max(elevation_map)*3/4] = 2
+        # p2, p98 = np.percentile(elevation_map, (2, 98))
+        # elevation_map = exposure.rescale_intensity(elevation_map, in_range=(p2, p98))
+        markers = image < np.max(image)/2 #(util.invert(image)/np.max(image)).astype(int)
+        self.elevation_map = elevation_map
+        # markers[elevation_map < np.max(elevation_map)/10] = 1
 
-        # Equalization
-        
+        # markers[image < np.max(image)/4] = 1
+        # markers[image > np.max(image)*3/4] = 2
+
+        # # find continuous region (low gradient -
+        # # where less than 10 for this image) --> markers
+        # # disk(5) is used here to get a more smooth image
+        # markers = rank.gradient(denoised, disk(5)) < 10
+        # markers = ndi.label(markers)[0]
+
+        # # local gradient (disk(2) is used to keep edges thin)
+        # gradient = rank.gradient(denoised, disk(2))
+
+        # # process the watershed
+        # labels = watershed(gradient, markers)
+
+        # # Equalization
+
         self.labels = watershed(elevation_map, markers, mask=image)
 
 
@@ -1045,7 +1060,7 @@ class Watershed(ProcessImage):
         ax = axes.ravel()
 
         ax[0].set_title('Gradient')
-        ax[0].imshow(self.image, cmap=plt.cm.gray)
+        ax[0].imshow(self.elevation_map, cmap=plt.cm.gray)
 
         ax[1].set_title('Image analysed')
         ax[1].imshow(original_image, cmap=plt.cm.gray)
@@ -1184,6 +1199,7 @@ if __name__ == '__main__':
 
 
     image_directory = "images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold"
+    image_directory = "images_RemoveBakelite_WhiteBackgroundRemoval_OtsuThreshold"
     processes = [ Watershed ]
     #    processes = [ ErosionSegmentation ]
 
