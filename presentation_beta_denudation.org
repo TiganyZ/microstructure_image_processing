@@ -29,12 +29,12 @@
 * Introduction
   #+REVEAL_HTML: <div class="column" style="float:left; width: 50%">
   - Fan blade manufacture involves blowing out of blade. 
-  - Reduction of the beta phase (beta denudation), can be seen in some
+  - Reduction of the beta phase ( _beta denudation_ ), can be seen in some
     samples due to ingress of O/N.
-  - This microstructural degradation decreases fatigue life. 
-  - Detection usually a manual process, by hand or macro.
-  - Automation provides a quick and useful "second opinion" to guide
-    judgement of rejection, taking into account all historical data.
+  - This microstructural degradation _decreases fatigue life_.
+  - Detection usually a _manual_ process, by hand or macro.
+  - _Automation_ provides a quick and useful "second opinion" to guide
+    _judgement of rejection_, taking into account all historical data.
   #+REVEAL_HTML: </div>
   #+REVEAL_HTML: <div class="column" style="float:right; width: 50%">
     [[file:images/I262562.jpg]]
@@ -65,7 +65,7 @@
 #+NAME: TBE band structure
 #+REVEAL_HTML: <div class="column" style="float:left; width: 50%">
 #+ATTR_HTML: :width 75% ;
-[[[[file:figures/I038878.jpg]]
+[[file:figures/I038878.jpg]]
 #+ATTR_HTML: :width 75% ;
 [[file:figures/I038878_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg]]
 #+REVEAL_HTML: </div>
