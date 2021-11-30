@@ -28,13 +28,13 @@
 
 * Introduction
   #+REVEAL_HTML: <div class="column" style="float:left; width: 50%">
-  - Beta denudation, reduction of the beta phase, seen in some surface
-    samples of Ti-64.
-  - This microstructural degradation increases potential for failure.
-  - Detection usually a manual process, involving measurement by hand or macro.
-  - Automation will provide a quick and useful "second
-    opinion" to guide judgement of whether a sample is beta
-    denudated or not, taking into account historical data.
+  - Fan blade manufacture involves blowing out of blade. 
+  - Reduction of the beta phase (beta denudation), can be seen in some
+    samples due to ingress of O/N.
+  - This microstructural degradation decreases fatigue life. 
+  - Detection usually a manual process, by hand or macro.
+  - Automation provides a quick and useful "second opinion" to guide
+    judgement of rejection, taking into account all historical data.
   #+REVEAL_HTML: </div>
   #+REVEAL_HTML: <div class="column" style="float:right; width: 50%">
     [[file:images/I262562.jpg]]
@@ -62,25 +62,40 @@
 
 * Image Processing
 
-
 #+NAME: TBE band structure
 #+REVEAL_HTML: <div class="column" style="float:left; width: 50%">
 #+ATTR_HTML: :width 75% ;
-[[file:figures/I062438.jpg]]
+[[[[file:figures/I038878.jpg]]
 #+ATTR_HTML: :width 75% ;
-[[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg]]
+[[file:figures/I038878_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg]]
 #+REVEAL_HTML: </div>
 
 #+ATTR_REVEAL: :frag fade-in
 #+REVEAL_HTML: <div class="column" style="float:right; width: 50%">
 #+ATTR_HTML: :width 75% ;
-[[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg]]
+[[file:figures/I038878_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg]]
 #+ATTR_HTML: :width 75% ;
-[[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold.jpg]]
+[[file:figures/I038878_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold.jpg]]
 #+REVEAL_HTML: </div>
 
+# #+NAME: TBE band structure
+# #+REVEAL_HTML: <div class="column" style="float:left; width: 50%">
+# #+ATTR_HTML: :width 75% ;
+# [[file:figures/I062438.jpg]]
+# #+ATTR_HTML: :width 75% ;
+# [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg]]
+# #+REVEAL_HTML: </div>
 
-** Comparing to macro
+# #+ATTR_REVEAL: :frag fade-in
+# #+REVEAL_HTML: <div class="column" style="float:right; width: 50%">
+# #+ATTR_HTML: :width 75% ;
+# [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg]]
+# #+ATTR_HTML: :width 75% ;
+# [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold.jpg]]
+# #+REVEAL_HTML: </div>
+
+
+** Comparison to previous method
 
 #+REVEAL_HTML: <div class="column" style="float:left; width: 48%">
 [[file:figures/I062438_RemoveBakeliteBoundary_WhiteBackgroundRemoval_OtsuThreshold.jpg]]
@@ -92,9 +107,10 @@
 
 * Extraction of Volume fraction
 
-  [[file:figures/analyse_data_surface_detection_and_data_extraction_heavily_denudated.png]]
-  [[file:figures/analyse_data_surface_detection_and_data_extraction_imageJ_chrisanalysis_first_sideways.png]]
-  [[file:figures/analyse_data_surface_detection_and_data_extraction_I038897_heavily_denudated.png]]
+  [[file:figures/analyse_data_surface_detection_and_data_extraction_I038897_heavily_denudated_actual.png]]
+  [[file:figures/analyse_data_surface_detection_and_data_extraction_I038897_heavily_denudated_chris.png]]
+
+  #  [[file:figures/analyse_data_surface_detection_and_data_extraction_imageJ_chrisanalysis_first_sideways.png]]
 
 
 
@@ -126,7 +142,15 @@
 
   # [[file:figures/analyse_data_surface_detection_and_data_extraction_denudated.png]]
 
-* Accuracy
+** Accuracy
+
+- Use model to predict whether we have denudation or not. 
+- Test how well automatic method classifies new samples based on data
+  it is trained on, either: 
+  - Manually collected data
+  - Macro collected data
+  - Automatic data extraction
+* 
 
 | Method                 | Automated | ImageJ Macro | Manual (Less data) |
 |------------------------+-----------+--------------+--------------------|
@@ -135,7 +159,13 @@
 
 * Conclusion
   - Efficiencies introduced in detection of beta denudation.
-    - Can analyse a batch of images together
     - Trained model gives results in seconds, for each image.
+    - Can analyse more than one image at a time
+    - Takes into account historical data, to make decision. 
+
   - Optimised image processing
   - Model is easily extensible (just feed more data)
+  - Image analysis software lends itself to more in-depth analysis
+    - Size of primary alpha
+    - Secondary alpha lath width 
+
