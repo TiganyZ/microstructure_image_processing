@@ -1,0 +1,3 @@
+# image   surface-to-bulk_ratio   classification[0=normal, 1=denudated]
+ I061416.jpg 0.7190371795219825 0
+ I061421.jpg 0.6253584724401827 0

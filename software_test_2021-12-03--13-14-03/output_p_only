@@ -1,0 +1,40 @@
+
+ Starting beta_den
+ > Images in directory 'images'
+ > Data directory/file = 'data.txt'
+ > Classification file = 'classification.txt'
+ > Showing visuals of steps? False 
+ > Processing? True 
+ > Analysing? False 
+ > Extracting? False 
+ > Classifying? False
+ 
+Starting to process images from images...
+> Processing using RemoveBakeliteBoundary method
+ > processing I061416.jpg
+> Saving processed image to images_RemoveBakeliteBoundary/I061416_RemoveBakeliteBoundary.jpg
+ > processing I061421.jpg
+> Saving processed image to images_RemoveBakeliteBoundary/I061421_RemoveBakeliteBoundary.jpg
+ > processing I061446.jpg
+> Saving processed image to images_RemoveBakeliteBoundary/I061446_RemoveBakeliteBoundary.jpg
+> Processing using WhiteBackgroundRemoval method
+ > processing I061416_RemoveBakeliteBoundary.jpg
+> Saving processed image to images_RemoveBakeliteBoundary_WhiteBackgroundRemoval/I061416_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg
+ > processing I061421_RemoveBakeliteBoundary.jpg
+> Saving processed image to images_RemoveBakeliteBoundary_WhiteBackgroundRemoval/I061421_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg
+ > processing I061446_RemoveBakeliteBoundary.jpg
+> Saving processed image to images_RemoveBakeliteBoundary_WhiteBackgroundRemoval/I061446_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg
+> Processing using HistogramEquilization method
+ > processing I061416_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg
+> Saving processed image to images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization/I061416_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg
+ > processing I061421_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg
+> Saving processed image to images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization/I061421_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg
+ > processing I061446_RemoveBakeliteBoundary_WhiteBackgroundRemoval.jpg
+> Saving processed image to images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization/I061446_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg
+> Processing using OtsuThreshold method
+ > processing I061416_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg
+> Saving processed image to images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold/I061416_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold.jpg
+ > processing I061421_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg
+> Saving processed image to images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold/I061421_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold.jpg
+ > processing I061446_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization.jpg
+> Saving processed image to images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold/I061446_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold.jpg
