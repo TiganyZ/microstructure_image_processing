@@ -338,7 +338,7 @@ from datetime import datetime
 from sklearn.datasets import make_classification
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, KFold, GridSearchCV, cross_val_score, train_test_split
-from sklearn.metrics import roc_curve, f1_score
+from sklearn.metrics import roc_curve, f1_score, precision_recall_curve
 from sklearn.metrics import accuracy_score
 from sklearn import svm
 import matplotlib.pyplot as plt
@@ -349,6 +349,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from preprocess_data import LinearFit
+from scipy.optimize import curve_fit, minimize
 # Make an abstract base class which supplies a processing function upon an image
 class DataTrainer(ABC):
     
@@ -685,8 +686,6 @@ class TrainLogisticRegression(DataTrainer):
 
         ordered = np.argsort(X_original[:,0])
         # ax[1].plot(X_original[:,0][ordered], probs[:,0][ordered], label="")#
-        ax[1].plot(X_original[:,0][ordered], probs[:,1][ordered], label="Denudation risk")#
-        ax[1].plot(X_original[:,0][ordered], probs[:,0][ordered], alpha=0.5, label="Normal risk")#
 
         ax[1].plot(X_original[:,0][ordered], probs[:,1][ordered], label="Denudation risk")#
         ax[1].plot(X_original[:,0][ordered], probs[:,0][ordered], alpha=0.5, label="Normal risk")#
@@ -808,153 +807,41 @@ class TrainLogisticRegression(DataTrainer):
 
     
 class ClassificationContainer:
-    def __init__(self, classification_methods, data: str, image_directory: str, excel_data: str, use_excel=True):
+    def __init__(self, classification_methods, data: str, image_directory: str, classification_data: str, classify_from_file=True, optimise_threshold=False):
         self.image_directory = image_directory        
         self.images = np.loadtxt(data, skiprows=1, usecols=(0,), dtype=np.str)
+        self.optimise_threshold = optimise_threshold
 
-        self.y = np.loadtxt(data, skiprows=1, usecols=(1,), dtype=np.int)
-        # using gradient and ratio for the data
-        self.X = np.loadtxt(data, skiprows=1, usecols=(2,4,), dtype=np.float)
+        # Assumed one has images in first column and surface to bulk ratios in next
+        self.data_to_test = np.loadtxt(data, skiprows=1, usecols=(1,), dtype=np.float)
+        
+        self.X = np.zeros((len(self.data_to_test), 2))
+        self.y = np.random.rand((len(self.data_to_test)))
+        
+        if classify_from_file:
+            print(f"\n >> Training model with data from {classification_data}")
+            classification_images = np.loadtxt(classification_data, skiprows=1, usecols=(0,), dtype=np.str)
+            ratios = np.loadtxt(classification_data, skiprows=1, usecols=(1,), dtype=np.float)
+            classification = np.loadtxt(classification_data, skiprows=1, usecols=(2,), dtype=np.int)
 
-        use_excel=1
-        if use_excel:
-            excel_images = np.loadtxt(excel_data, skiprows=1, usecols=(0,), dtype=np.str)
-            excel_manual = np.genfromtxt(excel_data, skip_header=1, usecols=(1,), dtype=np.float, missing_values = "NaN", filling_values=np.nan)
-
-            # print(excel_manual)
-            mask = excel_manual != np.nan
-            man = np.asarray( excel_manual[mask], dtype=np.float )
+            self.X = np.zeros((len(classification_images), 2))
+            self.y = classification
             
-
-            excel_ratios_v6 = np.loadtxt(excel_data, skiprows=1, usecols=(2,), dtype=np.float)
-            excel_ratios_v7 = np.loadtxt(excel_data, skiprows=1, usecols=(3,), dtype=np.float)
-            excel_ratios_v8_3 = np.loadtxt(excel_data, skiprows=1, usecols=(4,), dtype=np.float)
-            excel_ratios_v8_0  = np.loadtxt(excel_data, skiprows=1, usecols=(5,), dtype=np.float)
-            excel_ratios_ct  = np.loadtxt(excel_data, skiprows=1, usecols=(6,), dtype=np.float)
-            excel_ratios_cto  = np.loadtxt(excel_data, skiprows=1, usecols=(7,), dtype=np.float)            
-            excel_ratios_ct_old  = np.loadtxt(excel_data, skiprows=1, usecols=(8,), dtype=np.float)
-            excel_ratios_ct_oldold  = np.loadtxt(excel_data, skiprows=1, usecols=(9,), dtype=np.float)
-            excel_ratios_t  = np.loadtxt(excel_data, skiprows=1, usecols=(10,), dtype=np.float)
-
-            classification_t = np.loadtxt(excel_data, skiprows=1, usecols=(13,), dtype=np.int)
-            classification_c = np.loadtxt(excel_data, skiprows=1, usecols=(14,), dtype=np.int)
-
-            classification = np.zeros(classification_c.shape, dtype=np.int)
-            # Now change the classification to the same type
-            # > Classification C :
-            #    0 – Fully Single Grain Beta Denudation
-            #    1 – Close to Single Grain Beta Denudation
-            #    2 – Diffuse Beta Denudation
-            #    3 – Micro ok
-
-            classification[classification_c == 0] = 1                        
-            classification[classification_c == 1] = 1            
-            classification[classification_c == 2] = 1
-            classification[classification_c == 3] = 0
-
-            # classification[classification == 1] = 0
-            # classification[classification == 2] = 0
-            # classification[classification == 3] = 1
-
-
-            ratios = np.zeros((self.X.shape[0]))
-            for i_ind, ii in enumerate(self.images):
-                for ind, (ei, er, c) in enumerate(zip(excel_images, excel_ratios_v8_3, classification)):
-                    if ii.startswith(ei):
-                        print(ii, ei, er, c)
-                        ratios[i_ind] = er
-                        self.y[i_ind] = c
-
-            
-                        #            ratios[ratios < 0] = 0
-            delete = []
-            for ix, xi in enumerate(self.X[:,0]):
-                if ratios[ix] == 0:
-                    # Mark for deletion
-                    delete.append(False)
-                else:
-                    delete.append(True)
-
             self.X[:,0] = ratios
-            delete = np.asarray(delete)
-            self.new_X = np.zeros( (self.X.shape[0]-np.sum(delete==0), self.X.shape[1]  ) )
-            self.new_y = np.zeros( (self.X.shape[0]-np.sum(delete==0),), dtype=np.int )
-            self.new_X[:,0] = self.X[:,0][delete]
-            self.new_X[:,1] = self.X[:,1][delete]
-            ratios = ratios[delete]
 
-            self.new_y = self.y[delete]
+        else:
+            # Training from data itself
+            self.X[:,1] = self.data_to_test
 
-            self.X = self.new_X
-            self.y = self.new_y
-
-
-            # Fit the lines
-            # fit = LinearFit()
-            # self.params_v8, self.stdevs_v8 = fit.fit(**fit.straight(excel_ratios_v8_3[mask]))
-            # self.params_py, self.stdevs_py = fit.fit(**fit.straight(self.X[:,0][mask]))
-
-            # yv8  = fit.straight_line(excel_manual[mask], self.params_v8[0], self.params_v8[1])
-            # yv81 = fit.straight_line(excel_manual[mask], self.params_v8[0] + self.stdevs_v8[0], self.params_v8[1] - self.stdevs_v8[1])
-            # yv82 = fit.straight_line(excel_manual[mask], self.params_v8[0] - self.stdevs_v8[0], self.params_v8[1] + self.stdevs_v8[1])
-
-            # ypy  = fit.straight_line(excel_manual[mask], self.params_py[0], self.params_py[1])
-            # ypy1 = fit.straight_line(excel_manual[mask], self.params_py[0] + self.stdevs_py[0], self.params_py[1] - self.stdevs_py[1])
-            # ypy2 = fit.straight_line(excel_manual[mask], self.params_py[0] - self.stdevs_py[0], self.params_py[1] + self.stdevs_py[1])
-            
-            fig, ax = plt.subplots(ncols=1, figsize=(6, 4))
-
-            #ax.scatter(excel_manual[mask], excel_ratios_v6[mask], label="man vs v6")
-            #ax.scatter(excel_manual[mask], excel_ratios_v7[mask], label="man vs v7")
-            ax.scatter(excel_manual[mask], excel_ratios_v8_3[mask], alpha=0.4, label="Manual vs macro v8 3 sig")
-            ax.scatter(excel_manual[mask], excel_ratios_v8_0[mask], alpha=0.4, label="Manual vs macro v8 0 sig")            
-            ax.scatter(excel_manual[mask], self.X[:,0][mask],       alpha=0.4, label="Manual vs python")
-            # ax.set_xlim(0, 0.5)
-            # ax.set_ylim(0, 0.5)            
-
-
-            # ax.plot(excel_manual[mask], yb, 'r-', label="v8 fit")
-            # ax.plot(excel_manual[mask], yb1, 'g--')
-            # ax.plot(excel_manual[mask], yb2, 'g--')
-            # ax.fill_between(excel_manual[mask], yb1, yb2, facecolor="gray", alpha=0.15)
-
-
-            
-            # ax.scatter(excel_manual[mask], excel_ratios_ct[mask], label="man vs ct")
-            # ax.scatter(excel_manual[mask], excel_ratios_t[mask], label="man vs t")                
-            ax.plot(np.linspace(0.5,2.5,20), np.linspace(0.5,2.5,20), 'k--',label="Perfect correlation")
-            
-            ax.set_xlabel("manual")
-            ax.set_ylabel("macro")
-            ax.legend()
-
-
-            # ax[1].scatter(excel_ratios_t, excel_ratios_ct, label="t vs ct")
-            # ax[1].scatter(excel_ratios_ct, excel_ratios_ct_old, label="ct vs ct_old")
-            # ax[1].scatter(excel_ratios_ct, excel_ratios_ct_oldold, label="ct vs ct_oldold")
-            # ax[1].plot(np.linspace(0.75,1.35,20), np.linspace(0.75,1.35,20), 'k--',label="Perfect correlation")
-            # ax[1].scatter(excel_ratios_t, self.X[:,0], label="t vs python")
-            # ax[1].set_xlabel("manual")
-            # ax[1].set_ylabel("macro")
-            # ax[1].legend()
-
-
-            fig.tight_layout()
-            plt.show()
 
         self.X[:,1] = 0.
 
-        # self.X = np.reshape( self.X[mask], (np.sum(mask),2))
-        # self.X = np.zeros((np.sum(mask), 2))
-        # self.X[:,0] = excel_manual[mask]
-        # self.y = self.y[mask]
-
-        for i, x in enumerate(self.X):
-            print(self.X[i], self.y[i], mask[i])
-        
         # split into train test sets
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.3, random_state=2, stratify=self.y)
+        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.X, self.y, test_size=0.3, random_state=56, stratify=self.y)
 
+        # self.X_train = self.X
+        # self.y_train = self.y
+        # self.y_test = train_test_split(self.X, self.y, test_size=0.3, random_state=56, stratify=self.y)
         self.scaler = preprocessing.StandardScaler().fit(self.X_train)
         self.X_train_transformed = self.scaler.transform(self.X_train)
         self.X_test_transformed  = self.scaler.transform(self.X_test)
@@ -971,25 +858,88 @@ class ClassificationContainer:
             trainer = method()
             model = trainer.train(self.X_train_transformed, self.y_train)
 
-
             yhat = model.predict(self.X_test_transformed)
-            # evaluate the model
+            if self.optimise_threshold:
+                yhat = model.predict_proba(self.X_test_transformed)
+                yhat = yhat[:, 1]
+                # calculate pr-curve
+                precision, recall, thresholds = precision_recall_curve(self.y_test, yhat)
+                fscore = (2 * precision * recall) / (precision + recall)
+                # locate the index of the largest f score
+                ix = np.argmax(fscore)
+                print('Best Threshold=%f, F-Score=%.3f' % (thresholds[ix], fscore[ix]))
+                best_thresh = thresholds[ix]
+                # plot the roc curve for thebest_thresh = thresholds[ix model
+                no_skill = len(self.y_test[self.y_test==1]) / len(self.y_test)
+                plt.plot([0,1], [no_skill,no_skill], linestyle='--', label='No Skill')
+                plt.plot(recall, precision, marker='.', label='Logistic')
+                # axis labels
+                plt.xlabel('Recall')
+                plt.ylabel('Precision')
+                plt.legend()
+                # show the plot
+                plt.show()
+
+                # yhat = np.zeros(yhat.shape, dtype=bool)
+                yhat = model.predict_proba(self.X_test_transformed)[:,1] > best_thresh            
+                # evaluate the model
             acc = accuracy_score(self.y_test, yhat)
-            
             print(trainer.name, "\n", " > Score = ", acc)
             for yp, yt in zip(yhat, self.y_test):
                 print(" y: ", yp, yt, yp == yt)
+            
+            data_to_transform = np.zeros((len(self.data_to_test), 2))
+            data_to_transform[:,0] = self.data_to_test
+            data_transformed = self.scaler.transform(data_to_transform)
+
+            if self.optimise_threshold:
+                yhat = model.predict_proba(data_to_transform)[:,1] > best_thresh 
+            else:
+                yhat = model.predict(self.X_test_transformed)
+            
+            
+            self.save_classification_results(f"results_classifications_{self.dt}.txt", self.data_to_test, yhat)
 
             if plot:
                 trainer.plot(self.X_test_transformed, self.X_test, self.y_test, self.X_train_transformed, self.y_train, self.scaler)
             
+                
+    def polyfit(self, x, y, degree):
+        results = {}
+    
+        def straight_line(x, m, c):
+            return m*x + c
+
+        expected = (1., 0.0)
+        params,cov=curve_fit(straight_line, x, y, expected, maxfev=1000)
+        stdevs = np.sqrt(np.diag(cov))
+
+        # r-squared
+        # fit values, and mean
+        yhat = straight_line(x, *params)
+        ybar = np.sum(y)/len(y)          # or sum(y)/len(y)
+        ssreg = np.sum((yhat-ybar)**2)   # or sum([ (yihat - ybar)**2 for yihat in yhat])
+        sstot = np.sum((y - ybar)**2)    # or sum([ (yi - ybar)**2 for yi in y])
+        results['determination'] = ssreg / sstot
+
+        return results
 
     def create_output_directory(self):
         dir_name = f"{self.method_name}_{self.dt}_{self.image_directory}"
         if not os.path.exists(dir_name):
             os.mkdir(dir_name)
         return dir_name
-    
+
+    def save_classification_results(self, filename, ratios, classification):
+        comment = "# image   surface-to-bulk_ratio   classification[0=normal, 1=denudated]\n"
+        with open(filename, 'w') as f:
+            f.write(comment)
+
+        with open(filename, 'a') as f:
+            for i, im in enumerate(self.images):
+                f.write(f" {im} {ratios[i]} {classification[i]}\n")
+        
+            
 
     def save(self, image_name, data):
         self.dir_name = self.create_output_directory()
@@ -1040,13 +990,15 @@ if __name__ == '__main__':
     data = "MultisectionFit_2021-11-29--10-43-55.dat"
     data = "MultisectionFit_2021-11-29--11-57-06.dat"
     data = "MultisectionFit_2021-11-29--15-03-05.dat"
-    excel_data = 'excel_data.dat'
+    data = "MultisectionFit_2021-11-30--14-40-08.dat"
+    data = "MultisectionFit_2021-11-30--16-18-46.dat"
+    classification_data = 'classification_data.dat'
     
-    print(f"Analysing images from {image_directory}, using data {data}\n >with excel data {excel_data}..")
+    print(f"Analysing images from {image_directory}, using data {data}\n >with classification data {classification_data}..")
 
 
     trainers = [TrainLogisticRegression, TrainSVM]
-    cc = ClassificationContainer(trainers, data, image_directory, excel_data, use_excel=1)
+    cc = ClassificationContainer(trainers, data, image_directory, classification_data, classify_from_file=1)
     cc.train_models(plot=plot)
 
     

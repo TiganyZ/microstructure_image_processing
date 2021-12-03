@@ -8,7 +8,7 @@ from matplotlib.transforms import Affine2D
 from matplotlib.collections import PathCollection
 import imageio
 import numpy as np
-import re
+import re, copy
 from skimage import color, exposure, img_as_float, img_as_uint, img_as_ubyte, util, measure
 from scipy.optimize import curve_fit, minimize
 
@@ -220,15 +220,16 @@ class AlphaBetaFraction(ImageAnalysis):
         n_segments = len(coordinates)-1
         segment_fraction = np.zeros(n_segments)
 
-        coordinates[:,1] -= np.mean(coordinates[:,1])
+        new_coordinates = copy.deepcopy(coordinates)
+        new_coordinates[:,1] += 0.5*np.std(coordinates[:,1])
         
         d = 0
         
-        for i, coord in enumerate(coordinates):
+        for i, coord in enumerate(new_coordinates):
             if i+1 == n_segments:
                 break
-            x1, y1 = coordinates[i  ,0], np.int( coordinates[i  ,1] + depth) 
-            x2, y2 = coordinates[i+1,0], np.int( coordinates[i+1,1] + depth) 
+            x1, y1 = new_coordinates[i  ,0], np.int( new_coordinates[i  ,1] + depth) 
+            x2, y2 = new_coordinates[i+1,0], np.int( new_coordinates[i+1,1] + depth) 
 
             d = np.sqrt( (x1-x2)**2 + (y1-y2)**2 )
 
@@ -247,7 +248,7 @@ class AlphaBetaFraction(ImageAnalysis):
         # rescaled_image = exposure.rescale_intensity(unprocessed_image, in_range=(p2, p98))
         self.thresholded_image = unprocessed_image > 0.5*np.max(unprocessed_image)
         self.lower_boundary, self.mean, self.sigma = calculate_boundary(self.thresholded_image,
-                                                                        sample_rate=10, offset = 5, n_sigma=0)
+                                                                        sample_rate=60, offset = 5, n_sigma=0)
         image = util.invert(image)
         self.image = image
         Y1 = self.lower_boundary[0,1]
@@ -275,7 +276,7 @@ class AlphaBetaFraction(ImageAnalysis):
         
         self.offset = offset
         index = 0
-        straight = True
+        straight = False
         follow_boundary = not straight
 
         datax = []

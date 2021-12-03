@@ -189,7 +189,7 @@ class MultisectionFit(DataAnalysis):
     def __init__(self):
         self.fit = LinearFit()
         self.name = "MultisectionFit"
-        self.comment = "# gradient[ab_frac/pixel] mean_in_bulk[ab_frac] surface_bulk_ratio"
+        self.comment = "# surface_bulk_ratio"
 
     def compare_methods(self, linear_data, flat_data):
         self.params_flat,     self.stdevs_flat     = self.fit.fit(**self.fit.flat(flat_data))
@@ -226,7 +226,7 @@ class MultisectionFit(DataAnalysis):
         # self.data = "{self.params_straight[0]} {self.stdevs_straight[0]} {self.params_straight[1]} {self.stdevs_straight[0]} {self.params_flat[0]} {self.stdevs_flat[0]} \n"
 
         #        self.data = f"{self.params_straight[0]} {self.params_flat[0]} {mean_fit/self.params_flat[0]}\n"
-        self.data = f"{self.params_exponential[0]} {self.params_flat[0]} {mean_fit/mean_end}\n"        
+        self.data = f" {mean_fit/mean_end}\n"        
         return f_data, s_data_g, s_data_i
         
 
@@ -239,7 +239,7 @@ class MultisectionFit(DataAnalysis):
         segment = SegmentData(self.original_data, line)
         self.before, self.after = segment.segment_data()
 
-        n_partition = 5 # 3 means data is split into 2^3 = 8ths
+        n_partition = 6 # 3 means data is split into 2^3 = 8ths
         for i in range(n_partition):
             line = (np.max(self.before[:,0]) + np.min(self.before[:,0])) / 2.
             segment = SegmentData(self.before, line)
@@ -315,16 +315,16 @@ class MultisectionFit(DataAnalysis):
     
     
 class PreprocessContainer:
-    def __init__(self, analysis_method: Type[DataAnalysis], image_directory: str, data_directory: str, denudation_data:str):
+    def __init__(self, analysis_method: Type[DataAnalysis], image_directory: str, data_directory: str): #, denudation_data:str):
 
-        self.denudation_images  = np.loadtxt(denudation_data, usecols=(0,), skiprows=1, dtype=np.str)
-        self.denudation_classification  = np.loadtxt(denudation_data, usecols=(1,), skiprows=1, dtype=np.int)        
+        # self.denudation_images  = np.loadtxt(denudation_data, usecols=(0,), skiprows=1, dtype=np.str)
+        # self.denudation_classification  = np.loadtxt(denudation_data, usecols=(1,), skiprows=1, dtype=np.int)        
 
         self.image_directory = image_directory
-        self.images = self.sort_files_by_data(sorted(os.listdir(self.image_directory)), self.denudation_images)
+        self.images = sorted(os.listdir(self.image_directory)) # self.sort_files_by_data(sorted(os.listdir(self.image_directory)), self.denudation_images)
 
         self.data_directory = data_directory
-        self.data_files = self.sort_analysis_files_by_data( sorted(os.listdir(self.data_directory)), self.denudation_images)
+        self.data_files = sorted(os.listdir(self.data_directory)) # self.sort_analysis_files_by_data( sorted(os.listdir(self.data_directory)), self.denudation_images)
         
         self.method = analysis_method()
         self.method_name = self.method.name
@@ -335,7 +335,7 @@ class PreprocessContainer:
     def analyse_images(self, plot=True):
         mode = 'w'
 
-        for data_file, image, classification in zip(self.data_files, self.images, self.denudation_classification):
+        for data_file, image in zip(self.data_files, self.images):
             unprocessed_name = image #self.get_filename_from_id(image)
             print(f"\ndata_file = {data_file}\nimage = {self.image_directory}/{unprocessed_name} \n ")
             unprocessed_image =   color.rgb2gray(imageio.imread(f"{self.image_directory}/{unprocessed_name}"))
@@ -347,8 +347,8 @@ class PreprocessContainer:
             if plot:
                 self.method.plot(unprocessed_image)
 
-            self.method.comment.replace("#", "# Classification ")
-            self.save(image, f"{image} {classification:1d} " + self.method.data, mode)
+            self.method.comment.replace("#", "# Image ")
+            self.save(image, f"{image}  " + self.method.data, mode)
             mode='a'
 
     def create_output_directory(self):
@@ -425,13 +425,14 @@ if __name__ == "__main__":
 
     data_directory = "AlphaBetaFraction_2021-11-29--11-55-29_images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold"
     data_directory = "AlphaBetaFraction_2021-11-29--14-56-37_images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold"
-    
+
+    data_directory = "AlphaBetaFraction_2021-11-30--14-51-43_images_RemoveBakeliteBoundary_WhiteBackgroundRemoval_HistogramEquilization_OtsuThreshold"
     denudation_data = "denudation_data_new.dat"
     print(f"Preprocessing data from {data_directory}, with images from {image_directory}..")
     # Now analyse
     print(f"> Gradient data from alpha-beta fraction")
     analysis =  MultisectionFit #BisectionFit
-    ac = PreprocessContainer(analysis, image_directory, data_directory, denudation_data)
+    ac = PreprocessContainer(analysis, image_directory, data_directory)
     ac.analyse_images(plot=plot)
 
     # print(f"> Chris Alpha-beta fraction")

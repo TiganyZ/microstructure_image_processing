@@ -517,7 +517,7 @@ class RemoveBakeliteBoundary(ProcessImage):
         ax[1].axvline(self.thresh, color='r')
 
         ax[2].imshow(self.output, cmap=plt.cm.gray)
-        ax[2].set_title('Thresholded')
+        ax[2].set_title('removed')
         ax[2].axis('off')
 
         plt.show()
